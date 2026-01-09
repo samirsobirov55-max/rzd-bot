@@ -114,10 +114,40 @@ async def cmd_rules(message: types.Message):
     active_chats.add(message.chat.id)
     await message.answer(RULES_TEXT)
 
+from aiogram.filters import ChatMemberUpdatedFilter, JOIN_TRANSITION, IS_ADMIN, IS_NOT_ADMIN
+from aiogram.types import ChatMemberUpdated
+
+# --- 1. ПРИВЕТСТВИЕ ПРИ ВХОДЕ (Бот просто здоровается) ---
 @dp.message(F.new_chat_members)
 async def welcome(message: types.Message):
     active_chats.add(message.chat.id)
-    await message.answer(f"👋 Привет! Добро пожаловать.\n\n{RULES_TEXT}")
+    for new_user in message.new_chat_members:
+        if new_user.id == bot.id:
+            await message.answer(
+                "✨ **Здравствуйте! Спасибо за приглашение.**\n\n"
+                "Я на месте и готов помогать. Чтобы я мог следить за порядком и удалять нарушения, "
+                "пожалуйста, назначьте меня администратором чата. 😊"
+            )
+        else:
+            await message.answer(
+                f"👋 **Добро пожаловать, {new_user.first_name}!**\n\n"
+                f"Мы рады вас видеть. Ознакомьтесь с нашими правилами:\n\n{RULES_TEXT}"
+            )
+
+# --- 2. ПОДТВЕРЖДЕНИЕ ПРИ ПОЛУЧЕНИИ ПРАВ ---
+@dp.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=IS_NOT_ADMIN >> IS_ADMIN))
+async def on_promoted(event: ChatMemberUpdated):
+    can_delete = "✅" if event.new_chat_member.can_delete_messages else "❌"
+    can_restrict = "✅" if event.new_chat_member.can_restrict_members else "❌"
+    
+    await bot.send_message(
+        event.chat.id,
+        "🚂 **Права администратора получены!**\n\n"
+        "Благодарю за доверие. Теперь я полноценно приступаю к своим обязанностям:\n"
+        f"{can_delete} Контроль сообщений\n"
+        f"{can_restrict} Управление доступом\n\n"
+        "Системы запущены, порядок под контролем. Всем приятного общения! ✨"
+    )
 
 @dp.message(F.photo | F.video | F.animation)
 async def on_media(message: types.Message):
@@ -172,3 +202,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
