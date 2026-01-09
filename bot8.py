@@ -3,22 +3,41 @@ import re
 import time
 import os
 import traceback
+import logging
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.exceptions import TelegramBadRequest
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from aiohttp import web
 
 # --- НАСТРОЙКИ ---
-# TOKEN берется из переменных окружения Railway (BOT_TOKEN)
 TOKEN = os.getenv('BOT_TOKEN') 
 ADMIN_ID = 7913733869 # Твой ID для получения отчетов об ошибках
 
+logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 user_warns = {}
 user_messages = {}
+active_chats = set() # Для рассылки по расписанию
 
-# --- ПОЛНЫЙ СПИСОК МАТОВ И ЗАПРЕТКИ (РАСШИРЕННЫЙ) ---
+# --- ВЕБ-СЕРВЕР ДЛЯ RENDER (ЧТОБЫ НЕ ВЫКЛЮЧАЛСЯ) ---
+async def handle(request):
+    return web.Response(text="Bot is alive!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f">>> Веб-сервер запущен на порту {port}")
+
+# --- ПОЛНЫЙ СПИСОК МАТОВ И ЗАПРЕТКИ (БЕЗ ИЗМЕНЕНИЙ) ---
 BAD_WORDS = [
     r"\bху[йеияёю]\w*\b", r"\bхул[иея]\b", r"\bоху[ее]\w*\b", r"\bпоху\w*\b",
     r"\bпизд\w*\b", r"\bпропизд\w*\b", r"\bвыпизд\w*\b", r"\bеб[аеёиоуя]\w*\b", 
@@ -47,7 +66,20 @@ RULES_TEXT = (
     "🔟 **Атмосфера**: Будьте вежливы! ❤️"
 )
 
-# --- СИСТЕМА ЛОГОВ (ОШИБКИ В ЛС) ---
+# --- НОВЫЕ ФУНКЦИИ РАССЫЛКИ ---
+async def send_morning():
+    for chat_id in list(active_chats):
+        try:
+            await bot.send_message(chat_id, "☀️ **Доброе утро, команда!**\nПусть этот день принесет только зеленый свет на вашем пути. Продуктивной смены! 🚂💨")
+        except: pass
+
+async def send_night():
+    for chat_id in list(active_chats):
+        try:
+            await bot.send_message(chat_id, "🌙 **Смена окончена!**\nСпокойной ночи всем, кто ложится, и бодрости тем, кто на посту. Отдыхайте, друзья! 💤")
+        except: pass
+
+# --- СИСТЕМА ЛОГОВ ---
 async def send_admin_log(content, is_error=False):
     prefix = "❌ **КРИТИЧЕСКАЯ ОШИБКА**" if is_error else "🔔 **ЛОГ МОДЕРАЦИИ**"
     try: 
@@ -60,58 +92,49 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False):
     try:
         uid = message.from_user.id
         name = message.from_user.full_name
-        
-        # Проверка на админа (их нельзя мутить/банить)
         member = await bot.get_chat_member(message.chat.id, uid)
         if member.status in ["administrator", "creator"]: return
         
         await message.delete()
-        
         if is_ban:
             await bot.ban_chat_member(message.chat.id, uid)
             await bot.send_message(message.chat.id, f"🚫 {name} забанен навсегда!\nПричина: {reason}")
         else:
             mute_time = hours if hours > 0 else 1
             until = datetime.now() + timedelta(hours=mute_time)
-            await bot.restrict_chat_member(
-                message.chat.id, 
-                uid, 
-                permissions=types.ChatPermissions(can_send_messages=False), 
-                until_date=until
-            )
+            await bot.restrict_chat_member(message.chat.id, uid, permissions=types.ChatPermissions(can_send_messages=False), until_date=until)
             await bot.send_message(message.chat.id, f"⚠️ {name} получил мут на {mute_time} ч.\nПричина: {reason}")
             
         await send_admin_log(f"Чат: {message.chat.title}\nПользователь: {name} ({uid})\nДействие: {'БАН' if is_ban else 'МУТ'}\nПричина: {reason}")
     except Exception:
         await send_admin_log(traceback.format_exc(), is_error=True)
 
-# --- ОБРАБОТКА ВХОДА НОВЫХ УЧАСТНИКОВ ---
+# --- ОБРАБОТЧИКИ ---
 @dp.message(F.new_chat_members)
 async def on_join(message: types.Message):
+    active_chats.add(message.chat.id)
     try:
         for user in message.new_chat_members:
             if user.id == bot.id:
-                await message.answer("🚂 Модератор РЖД-Бот запущен и готов к работе! Сделайте меня администратором.")
+                await message.answer("🚂 Модератор РЖД-Бот запущен! Сделайте меня администратором.")
             else:
-                await message.answer(f"👋 Привет, {user.first_name}! Добро пожаловать в наш чат.\n\n{RULES_TEXT}")
-    except Exception:
-        await send_admin_log(traceback.format_exc(), is_error=True)
+                await message.answer(f"👋 Привет, {user.first_name}! Добро пожаловать.\n\n{RULES_TEXT}")
+    except: pass
 
-# --- ОБРАБОТКА МЕДИА (ФОТО/ВИДЕО) ---
 @dp.message(F.photo | F.video | F.animation)
 async def on_media(message: types.Message):
+    active_chats.add(message.chat.id)
     if message.caption:
         caption = message.caption.lower()
         if any(re.search(p, caption) for p in BAD_WORDS):
             await punish(message, "Запрещенный контент/мат в описании медиа", is_ban=True)
 
-# --- ОСНОВНАЯ ЛОГИКА МОДЕРАЦИИ ---
 @dp.message()
 async def main_mod(message: types.Message):
     try:
         if not message.text or message.chat.type == "private": return
+        active_chats.add(message.chat.id)
         
-        # Команда правил
         if message.text == "/rules":
             await message.answer(RULES_TEXT)
             return
@@ -120,23 +143,19 @@ async def main_mod(message: types.Message):
         now = time.time()
         uid = message.from_user.id
 
-        # 1. Анти-спам (проверка частоты сообщений)
         if uid in user_messages and now - user_messages[uid] < 0.7:
             await punish(message, "Спам/Флуд", hours=1)
             return
         user_messages[uid] = now
 
-        # 2. Анти-скам (робуксы и продажа аккаунтов)
         if any(x in text for x in ["robux", "робукс", "продам акк", "купи робуксы"]):
             await punish(message, "Мошенничество (Robux/Продажа)", is_ban=True)
             return
 
-        # 3. Анти-реклама (ссылки)
-        if "http" in text or "t.me/" in text or "t.me +" in text:
+        if "http" in text or "t.me/" in text:
             await punish(message, "Реклама сторонних ресурсов", hours=24)
             return
 
-        # 4. Проверка на мат (с очисткой текста от символов)
         clean_text = re.sub(r"[^а-яёa-z\s]", "", text)
         if any(re.search(p, clean_text) for p in BAD_WORDS):
             await punish(message, "Использование нецензурной лексики", hours=24)
@@ -145,8 +164,16 @@ async def main_mod(message: types.Message):
     except Exception:
         await send_admin_log(traceback.format_exc(), is_error=True)
 
+# --- ЗАПУСК ---
 async def main():
-    print(">>> Бот bot8.py запущен в облаке!")
+    await start_web_server() # Для порта Render
+    
+    scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
+    scheduler.add_job(send_morning, CronTrigger(hour=8, minute=0))
+    scheduler.add_job(send_night, CronTrigger(hour=22, minute=0))
+    scheduler.start()
+    
+    print(">>> Бот запущен!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
