@@ -63,8 +63,7 @@ BAD_WORDS = [
     r"\bсекс\w*\b", r"\bчлен\b", r"\bсиськ\w*\b", r"\bхентай\b", r"\bтрах\w*\b",
     r"\bсосать\w*\b", r"\bминет\b", r"\bголая\b", r"\bголый\b", r"\bвлагалищ\w*\b",
     r"\bпенис\b", r"\bпедикулез\b", r"\bспид\b", r"\bгероин\b", r"\bнаркот\w*\b", 
-    r"\bнахуй\w*\b", r"\bнах\w*\b
-]
+    r"\bнахуй\w*\b", r"\bнах\w*\b"]
 
 # --- ЛОГИРОВАНИЕ ДЛЯ ВСЕХ АДМИНОВ ---
 async def send_log_to_admins(chat_id, log_text):
@@ -187,3 +186,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
