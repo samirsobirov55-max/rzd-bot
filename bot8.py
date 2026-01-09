@@ -2,14 +2,12 @@ import asyncio
 import re
 import time
 import os
-import traceback
 import logging
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.exceptions import TelegramBadRequest
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
+from aiogram.types import ChatPermissions, ChatMemberUpdated
+from aiogram.filters import ChatMemberUpdatedFilter
 from aiohttp import web
 
 # --- НАСТРОЙКИ ---
@@ -22,8 +20,9 @@ dp = Dispatcher()
 
 user_messages = {}
 active_chats = set()
+warns = {} 
 
-# --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
+# --- ВЕБ-СЕРВЕР ---
 async def handle(request):
     return web.Response(text="Bot is alive!")
 
@@ -36,175 +35,147 @@ async def start_web_server():
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
 
-# --- ТВОЙ ПОЛНЫЙ СПИСОК МАТОВ ---
-BAD_WORDS = [
-    r"\bху[йеияёю]\w*\b", r"\bхул[иея]\b", r"\bоху[ее]\w*\b", r"\bпоху\w*\b",
-    r"\bпизд\w*\b", r"\bпропизд\w*\b", r"\bвыпизд\w*\b", r"\bеб[аеёиоуя]\w*\b", 
-    r"\bёб\w*\b", r"\bвыёб\w*\b", r"\bзаеб\w*\b", r"\bдоеб\w*\b", r"\bебл[аио]\w*\b",
-    r"\bбля[тд]\w*\b", r"\bблд\b", r"\bсук\w*\b", r"\bсуч[ьея]\w*\b",
-    r"\bмуд[аик]\w*\b", r"\bгн[ио]да\b", r"\bговн\w*\b", r"\bгандон\w*\b", 
-    r"\bпид[оа]р\w*\b", r"\bпед[оа]р\w*\b", r"\bшлюх\w*\b", r"\bшалав\w*\b",
-    r"\bзалуп\w*\b", r"\bкурв\w*\b", r"\bчмо\b", r"\bдроч\w*\b", r"\bмраз\w*\b",
-    r"\bублюд\w*\b", r"\bвырод\w*\b", r"\bдаун\b", r"\bдебил\w*\b", r"\bпорно\b",
-    r"\bсекс\b", r"\bчлен\b", r"\bсиськ\w*\b", r"\bхентай\b", r"\bтрах\w*\b",
-    r"\bсосать\b", r"\bминет\b", r"\bголая\b", r"\bголый\b", r"\bвлагалищ\w*\b",
-    r"\bпенис\b", r"\bпедикулез\b", r"\bспид\b", r"\bгероин\b", r"\bнаркот\w*\b"
-]
-
+# --- ПРАВИЛА ЧАТА ---
 RULES_TEXT = (
-    "🗓 **Правила чата**\n\n"
-    "1️⃣ **Уважение**: Без оскорблений. (мут 24 ч → бан)\n"
-    "2️⃣ **Спам**: Без флуда. (мут 1–12 ч)\n"
-    "3️⃣ **Контент**: Без 18+. (моментальный бан)\n"
-    "4️⃣ **Политика**: Запрещена. (мут 6 ч)\n"
-    "5️⃣ **Мошенничество**: Robux запрещены. (БАН)\n"
-    "6️⃣ **Roblox**: Соблюдаем правила платформы. (мут 24 ч)\n"
-    "7️⃣ **Реклама**: Ссылки запрещены. (мут 24 ч)\n"
-    "8️⃣ **Профили**: Без мата. (мут до исправления)\n"
-    "9️⃣ **Админ**: Решения не обсуждаются. (мут 12 ч)\n"
-    "🔟 **Атмосфера**: Будьте вежливы! ❤️"
+    "Правила чата\n\n"
+    "1. Уважение: Без оскорблений. (Варн -> Мут 24ч -> Бан)\n"
+    "2. Спам: Без флуда. (Мут 1-12ч)\n"
+    "3. Контент: Без 18+. (Мут/Бан)\n"
+    "4. Политика: Запрещена. (Мут 6ч)\n"
+    "5. Мошенничество: Robux запрещены. (БАН)\n"
+    "6. Roblox: Соблюдаем правила платформы. (Мут 24ч)\n"
+    "7. Реклама: Ссылки запрещены. (Мут 24ч)\n"
+    "8. Профили: Без мата. (Мут до исправления)\n"
+    "9. Админ: Решения не обсуждаются. (Мут 12ч)\n"
+    "10. Атмосфера: Будьте дружелюбны!"
 )
 
-# --- РАССЫЛКА ПО РАСПИСАНИЮ ---
-async def send_morning():
-    for chat_id in list(active_chats):
-        try: await bot.send_message(chat_id, "☀️ **Доброе утро, команда!**\nПродуктивной смены! 🚂💨")
-        except: pass
+# --- СПИСОК МАТОВ ---
+BAD_WORDS = [r"\bху[йеияёю]\w*\b", r"\bпизд\w*\b", r"\bеб[аеёиоуя]\w*\b", r"\bбля[тд]\w*\b", r"\bсук\w*\b"]
 
-async def send_night():
-    for chat_id in list(active_chats):
-        try: await bot.send_message(chat_id, "🌙 **Смена окончена!**\nСпокойной ночи! 💤")
-        except: pass
-
-# --- УВЕДОМЛЕНИЕ АДМИНОВ ---
-async def notify_all_admins(chat_id, text):
+# --- ЛОГИРОВАНИЕ ДЛЯ АДМИНОВ ---
+async def send_log_to_admins(chat_id, log_text):
     try:
         admins = await bot.get_chat_administrators(chat_id)
         for admin in admins:
             if not admin.user.is_bot:
-                try: await bot.send_message(admin.user.id, f"🔔 **ОТЧЕТ МОДЕРАЦИИ**\n\n{text}")
+                try: 
+                    await bot.send_message(admin.user.id, "ЛОГ МОДЕРАЦИИ\n\n" + log_text)
                 except: pass
     except: pass
 
-# --- НАКАЗАНИЕ ---
-async def punish(message: types.Message, reason: str, hours=0, is_ban=False):
+async def is_admin(message: types.Message):
     try:
+        member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+        return member.status in ["administrator", "creator"]
+    except: return False
+
+# --- УНИВЕРСАЛЬНАЯ ФУНКЦИЯ НАКАЗАНИЯ ---
+async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_warn=False):
+    try:
+        if await is_admin(message): return
         uid = message.from_user.id
         name = message.from_user.full_name
-        member = await bot.get_chat_member(message.chat.id, uid)
-        if member.status in ["administrator", "creator"]: return
+        chat_id = message.chat.id
         
         await message.delete()
-        
-        action_text = "БАН НАВСЕГДА" if is_ban else f"МУТ НА {hours if hours > 0 else 1} ч."
-        log_text = f"Пользователь: {name} ({uid})\nПричина: {reason}\nДействие: {action_text}"
-        
+
+        action = ""
+        finish_time = ""
+
         if is_ban:
-            await bot.ban_chat_member(message.chat.id, uid)
-        else:
-            until = datetime.now() + timedelta(hours=hours if hours > 0 else 1)
-            await bot.restrict_chat_member(message.chat.id, uid, permissions=types.ChatPermissions(can_send_messages=False), until_date=until)
+            await bot.ban_chat_member(chat_id, uid)
+            action = "БАН НАВСЕГДА"
+            await message.answer(f"Пользователь {name} забанен навсегда.\nПричина: {reason}")
         
-        await notify_all_admins(message.chat.id, log_text)
-    except: pass
+        elif is_warn:
+            warns[uid] = warns.get(uid, 0) + 1
+            if warns[uid] >= 3:
+                await bot.ban_chat_member(chat_id, uid)
+                action = "БАН (3/3 ВАРНА)"
+                await message.answer(f"Пользователь {name} забанен за 3/3 предупреждений.\nПричина: {reason}")
+                warns[uid] = 0
+            else:
+                action = f"ВАРН {warns[uid]}/3"
+                await message.answer(f"Пользователь {name} получил предупреждение {warns[uid]}/3.\nПричина: {reason}")
+        
+        else:
+            # Расчет времени окончания
+            until = datetime.now() + timedelta(hours=hours)
+            finish_time = until.strftime("%d.%m %H:%M")
+            await bot.restrict_chat_member(chat_id, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
+            action = f"МУТ НА {hours}ч"
+            await message.answer(f"Пользователь {name} заглушен до {finish_time}.\nПричина: {reason}")
+
+        log = f"Чат: {message.chat.title}\nНарушитель: {name}\nДействие: {action}\nПричина: {reason}"
+        if finish_time: log += f"\nОкончание: {finish_time}"
+        
+        await send_log_to_admins(chat_id, log)
+    except Exception as e:
+        logging.error(f"Ошибка в punish: {e}")
 
 # --- ОБРАБОТЧИКИ ---
+
 @dp.message(Command("rules"))
 async def cmd_rules(message: types.Message):
-    active_chats.add(message.chat.id)
     await message.answer(RULES_TEXT)
 
-# Исправленный импорт (убрали проблемные названия)
-from aiogram.filters import ChatMemberUpdatedFilter
-from aiogram.types import ChatMemberUpdated
-
-# --- 1. ПРИВЕТСТВИЕ ПРИ ВХОДЕ ---
 @dp.message(F.new_chat_members)
 async def welcome(message: types.Message):
-    for new_user in message.new_chat_members:
-        if new_user.id == bot.id:
-            await message.answer(
-                "✨ **Здравствуйте! Спасибо за приглашение.**\n\n"
-                "Я на месте и готов помогать. Чтобы я мог следить за порядком, "
-                "пожалуйста, назначьте меня администратором чата. 😊"
-            )
+    for user in message.new_chat_members:
+        if user.id == bot.id:
+            await message.answer("Здравствуйте! Я готов к работе. Пожалуйста, назначьте меня администратором.")
         else:
-            await message.answer(
-                f"👋 **Добро пожаловать, {new_user.first_name}!**\n\n"
-                f"Ознакомьтесь с нашими правилами:\n\n{RULES_TEXT}"
-            )
+            await message.answer(f"Добро пожаловать, {user.first_name} в наш чат! Ознакомься с правилами: /rules")
 
-# --- 2. ПОДТВЕРЖДЕНИЕ ПРИ ПОЛУЧЕНИИ ПРАВ (Универсальный способ) ---
 @dp.my_chat_member()
 async def on_promoted(event: ChatMemberUpdated):
-    # Проверяем: стал ли бот администратором
     if event.new_chat_member.status in ["administrator", "creator"]:
-        # Проверяем, были ли мы админами ДО этого (чтобы не спамить при каждом изменении прав)
-        if event.old_chat_member.status not in ["administrator", "creator"]:
-            can_delete = "✅" if event.new_chat_member.can_delete_messages else "❌"
-            can_restrict = "✅" if event.new_chat_member.can_restrict_members else "❌"
-            
-            await bot.send_message(
-                event.chat.id,
-                "🚂 **Права администратора получены!**\n\n"
-                "Благодарю за доверие. Теперь я полноценно приступаю к своим обязанностям:\n"
-                f"{can_delete} Контроль сообщений\n"
-                f"{can_restrict} Управление доступом\n\n"
-                "Системы запущены, порядок под контролем. ✨"
-            )
-
-@dp.message(F.photo | F.video | F.animation)
-async def on_media(message: types.Message):
-    active_chats.add(message.chat.id)
-    if message.caption:
-        caption = message.caption.lower()
-        if any(re.search(p, caption) for p in BAD_WORDS):
-            await punish(message, "Мат/Запрещенка в описании медиа", is_ban=True)
+        await bot.send_message(event.chat.id, "Права получены! Начинаю следить за порядком.")
 
 @dp.message()
 async def global_mod(message: types.Message):
-    if not message.text: return
-    active_chats.add(message.chat.id)
-
-    # Игнор постов самого канала
-    if message.sender_chat and message.sender_chat.type == "channel": return
-
+    if not message.text or await is_admin(message): return
     text = message.text.lower()
     uid = message.from_user.id
-    now = time.time()
 
-    # Анти-спам
-    if uid in user_messages and now - user_messages[uid] < 0.7:
-        await punish(message, "Спам/Флуд", hours=1)
-        return
-    user_messages[uid] = now
-
-    # Мошенничество
-    if any(x in text for x in ["robux", "робукс", "продам акк"]):
-        await punish(message, "Мошенничество (Robux)", is_ban=True)
+    # 5. Мошенничество (БАН)
+    if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
+        await punish(message, "Мошенничество (Пункт 5)", is_ban=True)
         return
 
-    # Реклама
+    # 7. Реклама (Мут 24ч)
     if "http" in text or "t.me/" in text:
-        await punish(message, "Реклама", hours=24)
+        await punish(message, "Реклама (Пункт 7)", hours=24)
         return
 
-    # Мат
+    # 4. Политика (Мут 6ч)
+    if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
+        await punish(message, "Политика (Пункт 4)", hours=6)
+        return
+
+    # 9. Обсуждение админа (Мут 12ч)
+    if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
+        await punish(message, "Обсуждение действий администрации (Пункт 9)", hours=12)
+        return
+
+    # 1. Мат (Варн)
     clean_text = re.sub(r"[^а-яёa-z\s]", "", text)
     if any(re.search(p, clean_text) for p in BAD_WORDS):
-        await punish(message, "Использование мата", hours=24)
+        await punish(message, "Использование мата (Пункт 1)", is_warn=True)
         return
+
+    # 2. Спам (Мут 1ч)
+    now = time.time()
+    if uid in user_messages and now - user_messages[uid] < 0.7:
+        await punish(message, "Спам/Флуд (Пункт 2)", hours=1)
+        return
+    user_messages[uid] = now
 
 # --- ЗАПУСК ---
 async def main():
     await start_web_server()
-    scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
-    scheduler.add_job(send_morning, CronTrigger(hour=8, minute=0))
-    scheduler.add_job(send_night, CronTrigger(hour=22, minute=0))
-    scheduler.start()
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=["message", "chat_member", "my_chat_member"])
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
