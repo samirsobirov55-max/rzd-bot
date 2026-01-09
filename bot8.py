@@ -12,7 +12,7 @@ from aiohttp import web
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv('BOT_TOKEN') 
-ADMIN_ID = 7913733869 
+# ADMIN_ID удален, бот работает динамически для всех админов
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -51,7 +51,8 @@ RULES_TEXT = (
 )
 
 # --- СПИСОК МАТОВ ---
-BAD_WORDS = [r"\bху[йеияёю]\w*\b", r"\bхул[иея]\b", r"\bоху[ее]\w*\b", r"\bпоху\w*\b",
+BAD_WORDS = [
+    r"\bху[йеияёю]\w*\b", r"\bхул[иея]\b", r"\bоху[ее]\w*\b", r"\bпоху\w*\b",
     r"\bпизд\w*\b", r"\bпропизд\w*\b", r"\bвыпизд\w*\b", r"\bеб[аеёиоуя]\w*\b", 
     r"\bёб\w*\b", r"\bвыёб\w*\b", r"\bзаеб\w*\b", r"\bдоеб\w*\b", r"\bебл[аио]\w*\b",
     r"\bбля[тд]\w*\b", r"\bблд\b", r"\bсук\w*\b", r"\bсуч[ьея]\w*\b",
@@ -59,20 +60,24 @@ BAD_WORDS = [r"\bху[йеияёю]\w*\b", r"\bхул[иея]\b", r"\bоху[е�
     r"\bпид[оа]р\w*\b", r"\bпед[оа]р\w*\b", r"\bшлюх\w*\b", r"\bшалав\w*\b",
     r"\bзалуп\w*\b", r"\bкурв\w*\b", r"\bчмо\b", r"\bдроч\w*\b", r"\bмраз\w*\b",
     r"\bублюд\w*\b", r"\bвырод\w*\b", r"\bдаун\b", r"\bдебил\w*\b", r"\bпорно\b",
-    r"\bсекс\b", r"\bчлен\b", r"\bсиськ\w*\b", r"\bхентай\b", r"\bтрах\w*\b",
-    r"\bсосать\b", r"\bминет\b", r"\bголая\b", r"\bголый\b", r"\bвлагалищ\w*\b",
-    r"\bпенис\b", r"\bпедикулез\b", r"\bспид\b", r"\bгероин\b", r"\bнаркот\w*\b", r"\bнахуй\w*\b", r"\bнах\w*\b"]
+    r"\bсекс\w*\b", r"\bчлен\b", r"\bсиськ\w*\b", r"\bхентай\b", r"\bтрах\w*\b",
+    r"\bсосать\w*\b", r"\bминет\b", r"\bголая\b", r"\bголый\b", r"\bвлагалищ\w*\b",
+    r"\bпенис\b", r"\bпедикулез\b", r"\bспид\b", r"\bгероин\b", r"\bнаркот\w*\b", 
+    r"\bнахуй\w*\b", r"\bнах\w*\b
+]
 
-# --- ЛОГИРОВАНИЕ ДЛЯ АДМИНОВ ---
+# --- ЛОГИРОВАНИЕ ДЛЯ ВСЕХ АДМИНОВ ---
 async def send_log_to_admins(chat_id, log_text):
     try:
         admins = await bot.get_chat_administrators(chat_id)
         for admin in admins:
             if not admin.user.is_bot:
                 try: 
-                    await bot.send_message(admin.user.id, "ЛОГ МОДЕРАЦИИ\n\n" + log_text)
-                except: pass
-    except: pass
+                    await bot.send_message(admin.user.id, "ОТЧЕТ МОДЕРАЦИИ\n\n" + log_text)
+                except: 
+                    pass # Пропускаем, если админ не нажал /start в личке
+    except Exception as e:
+        logging.error(f"Ошибка логирования: {e}")
 
 async def is_admin(message: types.Message):
     try:
@@ -110,7 +115,6 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
                 await message.answer(f"Пользователь {name} получил предупреждение {warns[uid]}/3.\nПричина: {reason}")
         
         else:
-            # Расчет времени окончания
             until = datetime.now() + timedelta(hours=hours)
             finish_time = until.strftime("%d.%m %H:%M")
             await bot.restrict_chat_member(chat_id, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
@@ -136,7 +140,7 @@ async def welcome(message: types.Message):
         if user.id == bot.id:
             await message.answer("Здравствуйте! Я готов к работе. Пожалуйста, назначьте меня администратором.")
         else:
-            await message.answer(f"Добро пожаловать, {user.first_name} в наш чат! Ознакомься с правилами: /rules")
+            await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
 
 @dp.my_chat_member()
 async def on_promoted(event: ChatMemberUpdated):
@@ -149,33 +153,27 @@ async def global_mod(message: types.Message):
     text = message.text.lower()
     uid = message.from_user.id
 
-    # 5. Мошенничество (БАН)
     if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
         await punish(message, "Мошенничество (Пункт 5)", is_ban=True)
         return
 
-    # 7. Реклама (Мут 24ч)
     if "http" in text or "t.me/" in text:
         await punish(message, "Реклама (Пункт 7)", hours=24)
         return
 
-    # 4. Политика (Мут 6ч)
     if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
         await punish(message, "Политика (Пункт 4)", hours=6)
         return
 
-    # 9. Обсуждение админа (Мут 12ч)
     if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
         await punish(message, "Обсуждение действий администрации (Пункт 9)", hours=12)
         return
 
-    # 1. Мат (Варн)
     clean_text = re.sub(r"[^а-яёa-z\s]", "", text)
     if any(re.search(p, clean_text) for p in BAD_WORDS):
         await punish(message, "Использование мата (Пункт 1)", is_warn=True)
         return
 
-    # 2. Спам (Мут 1ч)
     now = time.time()
     if uid in user_messages and now - user_messages[uid] < 0.7:
         await punish(message, "Спам/Флуд (Пункт 2)", hours=1)
@@ -189,5 +187,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
