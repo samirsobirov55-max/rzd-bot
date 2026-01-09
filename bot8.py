@@ -13,17 +13,16 @@ from aiohttp import web
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv('BOT_TOKEN') 
-ADMIN_ID = 7913733869 # Твой ID для получения отчетов об ошибках
+ADMIN_ID = 7913733869 # Твой ID
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-user_warns = {}
 user_messages = {}
-active_chats = set() # Для рассылки по расписанию
+active_chats = set()
 
-# --- ВЕБ-СЕРВЕР ДЛЯ RENDER (ЧТОБЫ НЕ ВЫКЛЮЧАЛСЯ) ---
+# --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
 async def handle(request):
     return web.Response(text="Bot is alive!")
 
@@ -32,12 +31,25 @@ async def start_web_server():
     app.router.add_get('/', handle)
     runner = web.AppRunner(app)
     await runner.setup()
-    port = int(os.getenv("PORT", 8080))
-    site = web.TCPSite(runner, '0.0.0.0', port)
+    site = web.TCPSite(runner, '0.0.0.0', int(os.getenv("PORT", 8080)))
     await site.start()
-    print(f">>> Веб-сервер запущен на порту {port}")
 
-# --- ПОЛНЫЙ СПИСОК МАТОВ И ЗАПРЕТКИ (БЕЗ ИЗМЕНЕНИЙ) ---
+# --- ФУНКЦИЯ УВЕДОМЛЕНИЯ ВСЕХ АДМИНОВ ---
+async def notify_all_admins(chat_id, text):
+    """Находит всех админов чата и шлет им сообщение в личку"""
+    try:
+        admins = await bot.get_chat_administrators(chat_id)
+        for admin in admins:
+            if not admin.user.is_bot:
+                try:
+                    await bot.send_message(admin.user.id, f"🔔 **ОТЧЕТ МОДЕРАЦИИ**\nГруппа: {chat_id}\n\n{text}")
+                except Exception:
+                    # Если админ не запустил бота в ЛС, сообщение не дойдет
+                    pass
+    except Exception as e:
+        logging.error(f"Ошибка рассылки админам: {e}")
+
+# --- СПИСОК МАТОВ (БЕЗ ИЗМЕНЕНИЙ) ---
 BAD_WORDS = [
     r"\bху[йеияёю]\w*\b", r"\bхул[иея]\b", r"\bоху[ее]\w*\b", r"\bпоху\w*\b",
     r"\bпизд\w*\b", r"\bпропизд\w*\b", r"\bвыпизд\w*\b", r"\bеб[аеёиоуя]\w*\b", 
@@ -66,26 +78,16 @@ RULES_TEXT = (
     "🔟 **Атмосфера**: Будьте вежливы! ❤️"
 )
 
-# --- НОВЫЕ ФУНКЦИИ РАССЫЛКИ ---
+# --- РАССЫЛКА ПО РАСПИСАНИЮ ---
 async def send_morning():
     for chat_id in list(active_chats):
-        try:
-            await bot.send_message(chat_id, "☀️ **Доброе утро, команда!**\nПусть этот день принесет только зеленый свет на вашем пути. Продуктивной смены! 🚂💨")
+        try: await bot.send_message(chat_id, "☀️ **Доброе утро, команда!**\nПродуктивной смены! 🚂💨")
         except: pass
 
 async def send_night():
     for chat_id in list(active_chats):
-        try:
-            await bot.send_message(chat_id, "🌙 **Смена окончена!**\nСпокойной ночи всем, кто ложится, и бодрости тем, кто на посту. Отдыхайте, друзья! 💤")
+        try: await bot.send_message(chat_id, "🌙 **Смена окончена!**\nСпокойной ночи! 💤")
         except: pass
-
-# --- СИСТЕМА ЛОГОВ ---
-async def send_admin_log(content, is_error=False):
-    prefix = "❌ **КРИТИЧЕСКАЯ ОШИБКА**" if is_error else "🔔 **ЛОГ МОДЕРАЦИИ**"
-    try: 
-        await bot.send_message(ADMIN_ID, f"{prefix}\n\n{content}")
-    except Exception as e: 
-        print(f"Не удалось отправить лог админу: {e}")
 
 # --- ФУНКЦИЯ НАКАЗАНИЯ ---
 async def punish(message: types.Message, reason: str, hours=0, is_ban=False):
@@ -96,84 +98,73 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False):
         if member.status in ["administrator", "creator"]: return
         
         await message.delete()
+        
+        log_msg = f"Пользователь: {name} ({uid})\nПричина: {reason}\nДействие: "
+        
         if is_ban:
             await bot.ban_chat_member(message.chat.id, uid)
-            await bot.send_message(message.chat.id, f"🚫 {name} забанен навсегда!\nПричина: {reason}")
+            log_msg += "БАН НАВСЕГДА"
         else:
             mute_time = hours if hours > 0 else 1
             until = datetime.now() + timedelta(hours=mute_time)
             await bot.restrict_chat_member(message.chat.id, uid, permissions=types.ChatPermissions(can_send_messages=False), until_date=until)
-            await bot.send_message(message.chat.id, f"⚠️ {name} получил мут на {mute_time} ч.\nПричина: {reason}")
+            log_msg += f"МУТ НА {mute_time} ч."
             
-        await send_admin_log(f"Чат: {message.chat.title}\nПользователь: {name} ({uid})\nДействие: {'БАН' if is_ban else 'МУТ'}\nПричина: {reason}")
+        # Отправляем лог только админам в ЛС
+        await notify_all_admins(message.chat.id, log_msg)
+        
     except Exception:
-        await send_admin_log(traceback.format_exc(), is_error=True)
+        logging.error(traceback.format_exc())
 
 # --- ОБРАБОТЧИКИ ---
 @dp.message(F.new_chat_members)
 async def on_join(message: types.Message):
     active_chats.add(message.chat.id)
-    try:
-        for user in message.new_chat_members:
-            if user.id == bot.id:
-                await message.answer("🚂 Модератор РЖД-Бот запущен! Сделайте меня администратором.")
-            else:
-                await message.answer(f"👋 Привет, {user.first_name}! Добро пожаловать.\n\n{RULES_TEXT}")
-    except: pass
-
-@dp.message(F.photo | F.video | F.animation)
-async def on_media(message: types.Message):
-    active_chats.add(message.chat.id)
-    if message.caption:
-        caption = message.caption.lower()
-        if any(re.search(p, caption) for p in BAD_WORDS):
-            await punish(message, "Запрещенный контент/мат в описании медиа", is_ban=True)
+    for user in message.new_chat_members:
+        if user.id != bot.id:
+            await message.answer(f"👋 Привет, {user.first_name}!\n\n{RULES_TEXT}")
 
 @dp.message()
 async def main_mod(message: types.Message):
-    try:
-        if not message.text or message.chat.type == "private": return
-        active_chats.add(message.chat.id)
-        
-        if message.text == "/rules":
-            await message.answer(RULES_TEXT)
-            return
-
-        text = message.text.lower()
-        now = time.time()
-        uid = message.from_user.id
-
-        if uid in user_messages and now - user_messages[uid] < 0.7:
-            await punish(message, "Спам/Флуд", hours=1)
-            return
-        user_messages[uid] = now
-
-        if any(x in text for x in ["robux", "робукс", "продам акк", "купи робуксы"]):
-            await punish(message, "Мошенничество (Robux/Продажа)", is_ban=True)
-            return
-
-        if "http" in text or "t.me/" in text:
-            await punish(message, "Реклама сторонних ресурсов", hours=24)
-            return
-
-        clean_text = re.sub(r"[^а-яёa-z\s]", "", text)
-        if any(re.search(p, clean_text) for p in BAD_WORDS):
-            await punish(message, "Использование нецензурной лексики", hours=24)
-            return
-
-    except Exception:
-        await send_admin_log(traceback.format_exc(), is_error=True)
-
-# --- ЗАПУСК ---
-async def main():
-    await start_web_server() # Для порта Render
+    if not message.text or message.chat.type == "private": return
+    active_chats.add(message.chat.id)
     
+    if message.text == "/rules":
+        await message.answer(RULES_TEXT)
+        return
+
+    text = message.text.lower()
+    now = time.time()
+    uid = message.from_user.id
+
+    # 1. Анти-спам
+    if uid in user_messages and now - user_messages[uid] < 0.7:
+        await punish(message, "Спам/Флуд", hours=1)
+        return
+    user_messages[uid] = now
+
+    # 2. Анти-скам
+    if any(x in text for x in ["robux", "робукс", "продам акк"]):
+        await punish(message, "Мошенничество", is_ban=True)
+        return
+
+    # 3. Ссылки
+    if "http" in text or "t.me/" in text:
+        await punish(message, "Реклама", hours=24)
+        return
+
+    # 4. Мат
+    clean_text = re.sub(r"[^а-яёa-z\s]", "", text)
+    if any(re.search(p, clean_text) for p in BAD_WORDS):
+        await punish(message, "Мат", hours=24)
+        return
+
+async def main():
+    await start_web_server()
     scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
     scheduler.add_job(send_morning, CronTrigger(hour=8, minute=0))
     scheduler.add_job(send_night, CronTrigger(hour=22, minute=0))
     scheduler.start()
-    
-    print(">>> Бот запущен!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
