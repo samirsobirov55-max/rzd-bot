@@ -132,6 +132,7 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    # Работает только в личных сообщениях
     if message.chat.type == "private":
         builder = InlineKeyboardBuilder()
         bot_info = await bot.get_me()
@@ -147,8 +148,6 @@ async def cmd_start(message: types.Message):
             reply_markup=builder.as_markup(),
             parse_mode="Markdown"
         )
-    else:
-        await message.answer("Я уже работаю в этой группе! Напишите мне в личку, чтобы настроить логи.")
 
 @dp.message(Command("rules"))
 async def cmd_rules(message: types.Message):
@@ -160,7 +159,7 @@ async def welcome(message: types.Message):
         if user.id == bot.id:
             await message.answer("Здравствуйте! Я готов к работе. Пожалуйста, назначьте меня администратором.")
         else:
-            await message.answer(f"Привет, {user.first_name} Добро пожаловать в наш чат! Ознакомься с правилами: /rules")
+            await message.answer(f"Привет, {user.first_name}! Добро пожаловать в наш чат! Ознакомься с правилами: /rules")
 
 @dp.my_chat_member()
 async def on_promoted(event: ChatMemberUpdated):
