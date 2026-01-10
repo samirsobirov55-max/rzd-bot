@@ -28,6 +28,11 @@ user_messages = {}
 active_chats = set()
 warns = {} 
 
+# Новые переменные для защиты от рейдов:
+join_history = []
+RAID_THRESHOLD = 3  # Порог входа (человек)
+RAID_WINDOW = 1    # Промежуток времени (секунд)
+
 # --- ВЕБ-СЕРВЕР ---
 async def handle(request):
     return web.Response(text="Bot is alive!")
@@ -213,12 +218,32 @@ async def bot_status(message: types.Message):
     await message.answer("✅ На месте")
 
 @dp.message(F.new_chat_members)
-async def welcome(message: types.Message):
+async def anti_raid_welcome(message: types.Message):
+    global join_history
+    now = time.time()
+    
+    # Очищаем старые записи (старше RAID_WINDOW секунд)
+    join_history = [t for t in join_history if now - t < RAID_WINDOW]
+    
     for user in message.new_chat_members:
         if user.id == bot.id:
-            await message.answer("Здравствуйте! Я готов к работе. Пожалуйста, назначьте меня администратором.")
+            await message.answer("Здравствуйте! Назначьте меня администратором для работы.")
+            continue
+
+        join_history.append(now)
+
+        # Проверка на рейд
+        if len(join_history) > RAID_THRESHOLD:
+            try:
+                await bot.ban_chat_member(message.chat.id, user.id)
+                await message.answer(f"⚠️ Обнаружена атака! Пользователь {user.full_name} забанен. Причина: Рейдер")
+                
+                log_text = f"Чат: {message.chat.title}\nДействие: БАН (Anti-Raid)\nНарушитель: {user.full_name}\nПричина: Рейдер"
+                await send_log_to_admins(message.chat.id, log_text)
+            except:
+                pass
         else:
-            await message.answer(f"Привет, {user.first_name}! Добро пожаловать в наш чат! Ознакомься с правилами: /rules")
+            await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
 
 @dp.my_chat_member()
 async def on_promoted(event: ChatMemberUpdated):
@@ -318,6 +343,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
