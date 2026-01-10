@@ -159,7 +159,7 @@ async def cmd_start(message: types.Message):
 async def cmd_rules(message: types.Message):
     await message.answer(RULES_TEXT)
 
-@dp.message(Command("function"))
+@dp.message(Command("functions"))
 async def cmd_functions(message: types.Message):
     text = (
         "Функции бота-модератора:\n\n"
@@ -288,4 +288,5 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
