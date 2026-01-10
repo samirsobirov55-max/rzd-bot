@@ -172,17 +172,21 @@ async def on_promoted(event: ChatMemberUpdated):
 
 @dp.message()
 async def global_mod(message: types.Message):
-    if not message.text or await is_admin(message): return
-    text = message.text.lower()
-    uid = message.from_user.id
+    # 1. Пропускаем админов и не-текстовые сообщения
+    if not message.text or await is_admin(message): 
+           return
 
- # ТИХОЕ УДАЛЕНИЕ АНГЛИЙСКИХ БУКВ (БЕЗ НАКАЗАНИЯ)
+    # 2. Тихое удаление английских букв
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
             return
         except:
             return
+
+    # 3. Подготовка текста для проверки матов и спама
+    text = message.text.lower()
+    uid = message.from_user.id
 
     if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
         await punish(message, "Мошенничество (Пункт 5)", is_ban=True)
@@ -218,5 +222,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
