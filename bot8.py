@@ -153,6 +153,10 @@ async def cmd_start(message: types.Message):
 async def cmd_rules(message: types.Message):
     await message.answer(RULES_TEXT)
 
+@dp.message(F.text.lower() == "бот")
+async def bot_status(message: types.Message):
+    await message.answer("✅ На месте")
+
 @dp.message(F.new_chat_members)
 async def welcome(message: types.Message):
     for user in message.new_chat_members:
@@ -206,3 +210,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
