@@ -1,6 +1,8 @@
 import random
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pytz import timezone
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
 import asyncio
 import re
 import time
@@ -245,12 +247,25 @@ scheduler = AsyncIOScheduler(timezone=timezone("Europe/Moscow"))
 scheduler.add_job(send_scheduled_msg, "cron", hour=8, minute=0, args=["morning"])
 scheduler.add_job(send_scheduled_msg, "cron", hour=22, minute=0, args=["night"])
 
+def run_dummy_server():
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+    server = HTTPServer(('0.0.0.0', 10000), Handler)
+    server.serve_forever()
+
 async def main():
-    scheduler.start() # Запускаем часы
+    # 1. Запускаем фальшивый сервер в отдельном потоке (чтобы Render был доволен)
+    threading.Thread(target=run_dummy_server, daemon=True).start()
+    
+    # 2. Запускаем будильник (планировщик)
+    scheduler.start()
+    
+    # 3. Чистим очередь сообщений и запускаем самого бота
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-
