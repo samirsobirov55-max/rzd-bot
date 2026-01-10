@@ -1,3 +1,6 @@
+import random
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pytz import timezone
 import asyncio
 import re
 import time
@@ -170,8 +173,12 @@ async def on_promoted(event: ChatMemberUpdated):
     if event.new_chat_member.status in ["administrator", "creator"]:
         await bot.send_message(event.chat.id, "Права получены! Начинаю следить за порядком.")
 
+active_groups = set() # Эту строку поставь ВНЕ функции, над ней
+
 @dp.message()
 async def global_mod(message: types.Message):
+    if message.chat.type in ['group', 'supergroup']:
+        active_groups.add(message.chat.id)
     # 1. Пропускаем админов и не-текстовые сообщения
     if not message.text or await is_admin(message): 
            return
@@ -216,12 +223,32 @@ async def global_mod(message: types.Message):
     user_messages[uid] = now
 
 # --- ЗАПУСК ---
+# Функция, которая будет отправлять сообщения
+async def send_scheduled_msg(mode):
+    if not active_groups:
+        return
+    
+    morning_texts = ["☀️ Доброе утро, чат! Просыпаемся! ☕", "🌅 Всем прекрасного утра! ✨"]
+    night_texts = ["🌙 Время 22:00. Всем спокойной ночи! 😴", "🌃 Пора отдыхать, доброй ночи! 💤"]
+    
+    text = random.choice(morning_texts if mode == "morning" else night_texts)
+    
+    for chat_id in list(active_groups):
+        try:
+            await bot.send_message(chat_id, text)
+        except:
+            active_groups.discard(chat_id)
+
+# Настройка будильника по МСК
+scheduler = AsyncIOScheduler(timezone=timezone("Europe/Moscow"))
+scheduler.add_job(send_scheduled_msg, "cron", hour=8, minute=0, args=["morning"])
+scheduler.add_job(send_scheduled_msg, "cron", hour=22, minute=0, args=["night"])
+
 async def main():
-    await start_web_server()
-    await dp.start_polling(bot, allowed_updates=["message", "chat_member", "my_chat_member"])
+    scheduler.start() # Запускаем часы
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
+    import asyncio
     asyncio.run(main())
-
-
-
