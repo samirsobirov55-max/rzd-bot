@@ -6,13 +6,13 @@ import logging
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import ChatPermissions, ChatMemberUpdated
+from aiogram.types import ChatPermissions, ChatMemberUpdated, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import ChatMemberUpdatedFilter
 from aiohttp import web
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv('BOT_TOKEN') 
-# ADMIN_ID удален, бот работает динамически для всех админов
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -60,10 +60,11 @@ BAD_WORDS = [
     r"\bпид[оа]р\w*\b", r"\bпед[оа]р\w*\b", r"\bшлюх\w*\b", r"\bшалав\w*\b",
     r"\bзалуп\w*\b", r"\bкурв\w*\b", r"\bчмо\b", r"\bдроч\w*\b", r"\bмраз\w*\b",
     r"\bублюд\w*\b", r"\bвырод\w*\b", r"\bдаун\b", r"\bдебил\w*\b", r"\bпорно\b",
-    r"\bсекс\w*\b", r"\bчлен\b", r"\bсиськ\w*\b", r"\bхентай\b", r"\bтрах\w*\b",
-    r"\bсосать\w*\b", r"\bминет\b", r"\bголая\b", r"\bголый\b", r"\bвлагалищ\w*\b",
+    r"\bсекс\b", r"\bчлен\b", r"\bсиськ\w*\b", r"\bхентай\b", r"\bтрах\w*\b",
+    r"\bсосать\b", r"\bминет\b", r"\bголая\b", r"\bголый\b", r"\bвлагалищ\w*\b",
     r"\bпенис\b", r"\bпедикулез\b", r"\bспид\b", r"\bгероин\b", r"\bнаркот\w*\b", 
-    r"\bнахуй\w*\b", r"\bнах\w*\b"]
+    r"\bнахуй\w*\b", r"\bнах\w*\b"
+]
 
 # --- ЛОГИРОВАНИЕ ДЛЯ ВСЕХ АДМИНОВ ---
 async def send_log_to_admins(chat_id, log_text):
@@ -74,7 +75,7 @@ async def send_log_to_admins(chat_id, log_text):
                 try: 
                     await bot.send_message(admin.user.id, "ОТЧЕТ МОДЕРАЦИИ\n\n" + log_text)
                 except: 
-                    pass # Пропускаем, если админ не нажал /start в личке
+                    pass 
     except Exception as e:
         logging.error(f"Ошибка логирования: {e}")
 
@@ -129,6 +130,26 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
 
 # --- ОБРАБОТЧИКИ ---
 
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    if message.chat.type == "private":
+        builder = InlineKeyboardBuilder()
+        bot_info = await bot.get_me()
+        url = f"https://t.me/{bot_info.username}?startgroup=true"
+        builder.row(types.InlineKeyboardButton(text="➕ Добавить в группу", url=url))
+        
+        await message.answer(
+            f"Привет, {message.from_user.first_name}!\n\n"
+            "🛡 Я — бот-модератор. Я защищаю чаты от мата, спама и 18+ контента.\n\n"
+            "ℹ️ **Для админов:**\n"
+            "Нажав эту кнопку, вы разрешили мне присылать вам отчеты о нарушениях в личку.\n\n"
+            "Нажмите кнопку ниже, чтобы добавить меня в свой чат:",
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown"
+        )
+    else:
+        await message.answer("Я уже работаю в этой группе! Напишите мне в личку, чтобы настроить логи.")
+
 @dp.message(Command("rules"))
 async def cmd_rules(message: types.Message):
     await message.answer(RULES_TEXT)
@@ -139,7 +160,7 @@ async def welcome(message: types.Message):
         if user.id == bot.id:
             await message.answer("Здравствуйте! Я готов к работе. Пожалуйста, назначьте меня администратором.")
         else:
-            await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
+            await message.answer(f"Привет, {user.first_name} Добро пожаловать в наш чат! Ознакомься с правилами: /rules")
 
 @dp.my_chat_member()
 async def on_promoted(event: ChatMemberUpdated):
@@ -186,4 +207,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
