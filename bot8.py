@@ -13,6 +13,7 @@ from aiogram.types import ChatPermissions, ChatMemberUpdated, InlineKeyboardButt
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import ChatMemberUpdatedFilter
 from aiohttp import web
+active_groups = set()
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv('BOT_TOKEN') 
@@ -252,3 +253,4 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
