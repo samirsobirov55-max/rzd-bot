@@ -159,6 +159,25 @@ async def cmd_start(message: types.Message):
 async def cmd_rules(message: types.Message):
     await message.answer(RULES_TEXT)
 
+@dp.message(Command("function"))
+async def cmd_functions(message: types.Message):
+    text = (
+        "Функции бота-модератора:\n\n"
+        "Модерация:\n"
+        "- Удаление сообщений с английскими буквами (латиницей).\n"
+        "- Авто-предупреждения и мут за мат.\n"
+        "- Бан за рекламу, спам и мошенничество (робуксы).\n"
+        "- Мут за обсуждение действий админа или политику.\n\n"
+        "Автоматизация:\n"
+        "- Пожелание доброго утра ровно в 08:00 (МСК).\n"
+        "- Пожелание спокойной ночи ровно в 22:00 (МСК).\n\n"
+        "Команды:\n"
+        "- /rules — показать правила чата.\n"
+        "- /function — список всех возможностей.\n"
+        "- Напиши слово бот — проверить статус работы."
+    )
+    await message.answer(text)
+
 @dp.message(F.text.lower() == "бот")
 async def bot_status(message: types.Message):
     await message.answer("✅ На месте")
@@ -269,3 +288,4 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
