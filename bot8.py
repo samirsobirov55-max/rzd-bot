@@ -176,6 +176,14 @@ async def global_mod(message: types.Message):
     text = message.text.lower()
     uid = message.from_user.id
 
+ # ТИХОЕ УДАЛЕНИЕ АНГЛИЙСКИХ БУКВ (БЕЗ НАКАЗАНИЯ)
+    if re.search(r'[a-zA-Z]', message.text):
+        try:
+            await message.delete()
+            return
+        except:
+            return
+
     if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
         await punish(message, "Мошенничество (Пункт 5)", is_ban=True)
         return
@@ -210,4 +218,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
