@@ -154,7 +154,7 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
 # --- ОБРАБОТЧИКИ ---
 
 # Команда для просмотра списка забаненных
-@dp.message_handler(commands=['banlist'])
+@dp.message(commands=['banlist']) # <-- Было message_handler, стало message
 async def show_banlist(message: types.Message):
     if not await is_admin(message): return
     
@@ -168,7 +168,7 @@ async def show_banlist(message: types.Message):
     await message.answer(text, parse_mode="Markdown")
 
 # Команда для просмотра списка мутов
-@dp.message_handler(commands=['mutelist'])
+@dp.message(commands=['mutelist']) # <-- И здесь тоже убираем _handler
 async def show_mutelist(message: types.Message):
     if not await is_admin(message): return
     
@@ -417,6 +417,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
