@@ -243,8 +243,10 @@ async def anti_raid_welcome(message: types.Message):
             except:
                 pass
         else:
-            await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
-
+        try:
+    await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
+except Exception as e:
+    logging.error(f"Не удалось отправить приветствие: {e}")
 @dp.my_chat_member()
 async def on_promoted(event: ChatMemberUpdated):
     if event.new_chat_member.status in ["administrator", "creator"]:
@@ -328,32 +330,30 @@ def run_dummy_server():
     server.serve_forever()
 
 async def main():
-    # 1. Запускаем фоновый сервер для Render
+    # 1. Запуск сервера для Render
     threading.Thread(target=run_dummy_server, daemon=True).start()
     
-    # 2. Запускаем планировщик (утро/вечер)
-    asyncio.create_task(scheduler())
+    # 2. Правильный запуск планировщика APScheduler
+    scheduler.start() 
 
-  # --- НОВЫЙ БЛОК: Технические уведомления ---
-    tech_messages = [
-        "🔄 Запуск бота...",
-        "📥 Обновление систем...",
-        "Проверка плагинов...",
-        "Бот активен!"
-    ]
-    
+    # 3. Анимированные уведомления (код со скриншота 84)
     for chat_id in list(active_groups):
         try:
-            for msg in tech_messages:
-                await bot.send_message(chat_id, msg)
-                await asyncio.sleep(0.5) # Пауза важна, чтобы не забанили
+            status_msg = await bot.send_message(chat_id, "🔄 Запуск бота...")
+            await asyncio.sleep(2)
+            await status_msg.edit_text("📥 Установка обновлений...")
+            await asyncio.sleep(4)
+            await status_msg.edit_text("⚙️ Проверка плагинов...")
+            await asyncio.sleep(3)
+            await status_msg.edit_text("✅ Бот активен и готов к работе!")
         except Exception as e:
-            logging.error(f"Ошибка тех. рассылки в {chat_id}: {e}")
+            logging.error(f"Ошибка анимации в {chat_id}: {e}")
 
-    # 3. Запускаем "прослушку" Телеграма
+    # 4. Запуск прослушки
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
