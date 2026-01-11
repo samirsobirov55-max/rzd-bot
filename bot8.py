@@ -243,10 +243,11 @@ async def anti_raid_welcome(message: types.Message):
             except:
                 pass
         else:
-        try:
-    await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
-except Exception as e:
-    logging.error(f"Не удалось отправить приветствие: {e}")
+              try:
+                  await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
+             except Exception as e:
+                # И эта строка тоже
+                logging.error(f"Не удалось отправить приветствие: {e}")
 @dp.my_chat_member()
 async def on_promoted(event: ChatMemberUpdated):
     if event.new_chat_member.status in ["administrator", "creator"]:
@@ -356,4 +357,5 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
