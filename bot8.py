@@ -101,67 +101,55 @@ async def is_admin(message: types.Message):
 
 # --- УНИВЕРСАЛЬНАЯ ФУНКЦИЯ НАКАЗАНИЯ ---
 async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_warn=False):
-     try:
-              if await is_admin(message): return
-              uid = message.from_user.id
-              name = message.from_user.full_name
-              chat_id = message.chat.id
+try:
+        if await is_admin(message): return
+        uid = message.from_user.id
+        name = message.from_user.full_name
+        chat_id = message.chat.id
+        
+        await message.delete()
+
+        action = ""
+        finish_time = ""
+
+        if is_ban:
+            await bot.ban_chat_member(chat_id, uid)
+            ban_list_history[uid] = f"{name} (Причина: {reason})"
+            action = "БАН НАВСЕГДА"
+            await message.answer(f"🚫 Пользователь {name} забанен.\nПричина: {reason}")
             
-              await message.delete()
-    
-              action = ""
-              finish_time = ""
-     
-              if is_ban:
-                await bot.ban_chat_member(chat_id, uid)
-                ban_list_history[uid] = f"{name} (Причина: {reason})" # Записываем в бан-лист
-                # ... остальной код ...
-               elif is_warn and warns[uid] == 3:
-                # Когда даем мут на 24 часа
+        elif is_warn:
+            warns[uid] = warns.get(uid, 0) + 1
+            if warns[uid] == 3:
                 until = datetime.now() + timedelta(hours=24)
-                mute_list_history[uid] = f"{name} (до {until.strftime('%d.%m %H:%M')})" # Записываем в мут-лист
-                # ... остальной код ...
-            
-                if is_ban:
-                await bot.ban_chat_member(chat_id, uid)
-                action = "БАН НАВСЕГДА"
-                await message.answer(f"Пользователь {name} забанен навсегда.\nПричина: {reason}")
-            
-                elif is_warn:
-                warns[uid] = warns.get(uid, 0) + 1
-                
-                if warns[uid] == 3:
-                    # ВМЕСТО БАНА ДЕЛАЕМ МУТ НА 24 ЧАСА
-                    until = datetime.now() + timedelta(hours=24)
-                    finish_time = until.strftime("%d.%m %H:%M")
-                    await bot.restrict_chat_member(chat_id, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
-                    action = "МУТ 24ч (3/3 ВАРНА)"
-                    await message.answer(f"🤫 Пользователь {name} получил 3/3 варна. Мут на 24 часа!\nПричина: {reason}")
-                
-                elif warns[uid] > 3:
-                    # ЕСЛИ НАРУШИЛ ПОСЛЕ МУТА — ТОГДА БАН
-                    await bot.ban_chat_member(chat_id, uid)
-                    action = "БАН (РЕЦИДИВ)"
-                    await message.answer(f"🚫 Пользователь {name} забанен за повторное нарушение после мута.\nПричина: {reason}")
-                    warns[uid] = 0
-                
-                else:
-                    action = f"ВАРН {warns[uid]}/3"
-                    await message.answer(f"⚠️ Пользователь {name} получил предупреждение {warns[uid]}/3.\nПричина: {reason}")
-            
-            else:
-                until = datetime.now() + timedelta(hours=hours)
                 finish_time = until.strftime("%d.%m %H:%M")
+                mute_list_history[uid] = f"{name} (до {finish_time})"
                 await bot.restrict_chat_member(chat_id, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
-                action = f"МУТ НА {hours}ч"
-                await message.answer(f"Пользователь {name} заглушен до {finish_time}.\nПричина: {reason}")
-    
-            log = f"Чат: {message.chat.title}\nНарушитель: {name}\nДействие: {action}\nПричина: {reason}"
-            if finish_time: log += f"\nОкончание: {finish_time}"
-            
-            await send_log_to_admins(chat_id, log)
-            except Exception as e:
-                  logging.error(f"Ошибка в punish: {e}")
+                action = "МУТ 24ч (3/3 ВАРНА)"
+                await message.answer(f"🤫 {name} получил 3/3 варна. Мут на 24 часа!\nПричина: {reason}")
+            elif warns[uid] > 3:
+                await bot.ban_chat_member(chat_id, uid)
+                action = "БАН (РЕЦИДИВ)"
+                await message.answer(f"🚫 {name} забанен за рецидив.\nПричина: {reason}")
+                warns[uid] = 0
+            else:
+                action = f"ВАРН {warns[uid]}/3"
+                await message.answer(f"⚠️ {name} получил предупреждение {warns[uid]}/3.\nПричина: {reason}")
+        
+        else:
+            until = datetime.now() + timedelta(hours=hours)
+            finish_time = until.strftime("%d.%m %H:%M")
+            await bot.restrict_chat_member(chat_id, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
+            action = f"МУТ НА {hours}ч"
+            await message.answer(f"Пользователь {name} заглушен до {finish_time}.\nПричина: {reason}")
+
+        # Логи вынесены за пределы условий, чтобы работать ВСЕГДА
+        log = f"Чат: {message.chat.title}\nНарушитель: {name}\nДействие: {action}\nПричина: {reason}"
+        if finish_time: log += f"\nОкончание: {finish_time}"
+        await send_log_to_admins(chat_id, log)
+
+    except Exception as e:
+        logging.error(f"Ошибка в punish: {e}")
 
 # --- ОБРАБОТЧИКИ ---
 
@@ -427,6 +415,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
