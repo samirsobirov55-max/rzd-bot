@@ -331,11 +331,24 @@ def run_dummy_server():
     server.serve_forever()
 
 async def main():
-    # 1. ДОБАВЬ ЭТУ СТРОКУ (запуск веб-сервера из строки 330-331)
+    # 1. Создаем сервер прямо здесь, чтобы он был доступен
+    from http.server import HTTPServer, BaseHTTPRequestHandler
     import threading
-    threading.Thread(target=lambda: server.serve_forever(), daemon=True).start()
 
-    # 2. Остальное оставляем как было
+    class SimpleHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"Bot is running")
+
+    # Создаем объект сервера
+    httpd = HTTPServer(('0.0.0.0', 10000), SimpleHandler)
+    
+    # Запускаем его в отдельном потоке
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    logging.info("Фоновый веб-сервер запущен на порту 10000")
+
+    # 2. Остальной твой код
     scheduler.start()
     logging.info("Планировщик запущен.")
     logging.info("Бот запущен и готов к работе!")
@@ -348,6 +361,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
