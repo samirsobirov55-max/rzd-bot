@@ -244,8 +244,8 @@ async def anti_raid_welcome(message: types.Message):
                 pass
         else:
               try:
-                  await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
-             except Exception as e:
+                   await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
+              except Exception as e:
                 # И эта строка тоже
                 logging.error(f"Не удалось отправить приветствие: {e}")
 @dp.my_chat_member()
@@ -357,5 +357,6 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
