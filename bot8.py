@@ -281,8 +281,11 @@ async def global_mod(message: types.Message):
             return
 
     # 3. Подготовка текста для проверки матов и спама
+    # 3. Подготовка текста
     text = message.text.lower()
-    uid = message.from_user.id
+    
+    # Создаем версию текста ВООБЩЕ БЕЗ пробелов и знаков
+    super_clean_text = re.sub(r"[^а-яё]", "", text) 
 
     if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
         await punish(message, "Мошенничество (Пункт 5)", is_ban=True)
@@ -305,10 +308,16 @@ async def global_mod(message: types.Message):
         await punish(message, "Тяжелые оскорбления (БАН)", is_ban=True)
         return
     
-    clean_text = re.sub(r"[^а-яёa-z\s]", "", text)
-    if any(re.search(p, clean_text) for p in BAD_WORDS):
-        await punish(message, "Использование мата (Пункт 1)", is_warn=True)
-        return
+   # Проверка обычных матов
+    # Проверяем каждое слово из списка BAD_WORDS (убрав из них знаки \b)
+    for pattern in BAD_WORDS:
+        # Убираем технические символы регулярки для простой проверки
+        # Убираем ВСЕ технические символы, оставляя только чистые русские буквы
+        base_word = re.sub(r"[^а-яё]", "", pattern.replace(r"\b", "").replace(r"\w*", ""))
+        
+        if base_word and base_word in super_clean_text:
+            await punish(message, "Использование мата (Пункт 1)", is_warn=True)
+            return
 
     now = time.time()
     if uid in user_messages and now - user_messages[uid] < 0.7:
@@ -377,4 +386,5 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
