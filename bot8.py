@@ -101,8 +101,8 @@ async def is_admin(message: types.Message):
 
 # --- УНИВЕРСАЛЬНАЯ ФУНКЦИЯ НАКАЗАНИЯ ---
 async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_warn=False):
-try:
-        if await is_admin(message): return
+    try:  # <--- ЗДЕСЬ ДОЛЖНО БЫТЬ 4 ПРОБЕЛА ПЕРЕД try
+        if await is_admin(message): return  # <--- ЗДЕСЬ 8 ПРОБЕЛОВ (4 + 4 внутри try)
         uid = message.from_user.id
         name = message.from_user.full_name
         chat_id = message.chat.id
@@ -415,6 +415,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
