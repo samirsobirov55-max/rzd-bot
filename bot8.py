@@ -300,6 +300,11 @@ async def global_mod(message: types.Message):
         await punish(message, "Обсуждение действий администрации (Пункт 9)", hours=12)
         return
 
+    # Проверка на слова для МГНОВЕННОГО БАНА
+    if re.search(r"\bшлюх\w*\b", text):
+        await punish(message, "Тяжелые оскорбления (БАН)", is_ban=True)
+        return
+    
     clean_text = re.sub(r"[^а-яёa-z\s]", "", text)
     if any(re.search(p, clean_text) for p in BAD_WORDS):
         await punish(message, "Использование мата (Пункт 1)", is_warn=True)
@@ -372,3 +377,4 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
