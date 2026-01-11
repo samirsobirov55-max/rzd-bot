@@ -250,8 +250,6 @@ async def on_promoted(event: ChatMemberUpdated):
     if event.new_chat_member.status in ["administrator", "creator"]:
         await bot.send_message(event.chat.id, "Права получены! Начинаю следить за порядком.")
 
-active_groups = set() # Эту строку поставь ВНЕ функции, над ней
-
 @dp.message()
 async def global_mod(message: types.Message):
     if message.chat.type in ['group', 'supergroup']:
@@ -330,22 +328,32 @@ def run_dummy_server():
     server.serve_forever()
 
 async def main():
-    # 1. Запускаем фальшивый сервер в отдельном потоке (чтобы Render был доволен)
+    # 1. Запускаем фоновый сервер для Render
     threading.Thread(target=run_dummy_server, daemon=True).start()
     
-    # 2. Запускаем будильник (планировщик)
-    scheduler.start()
+    # 2. Запускаем планировщик (утро/вечер)
+    asyncio.create_task(scheduler())
+
+  # --- НОВЫЙ БЛОК: Технические уведомления ---
+    tech_messages = [
+        "🔄 Запуск бота...",
+        "📥 Обновление систем...",
+        "Проверка плагинов...",
+        "Бот активен!"
+    ]
     
-    # 3. Чистим очередь сообщений и запускаем самого бота
+    for chat_id in list(active_groups):
+        try:
+            for msg in tech_messages:
+                await bot.send_message(chat_id, msg)
+                await asyncio.sleep(0.5) # Пауза важна, чтобы не забанили
+        except Exception as e:
+            logging.error(f"Ошибка тех. рассылки в {chat_id}: {e}")
+
+    # 3. Запускаем "прослушку" Телеграма
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-
-
-
-
-
-
