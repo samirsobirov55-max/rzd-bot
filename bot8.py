@@ -32,6 +32,9 @@ warns = {}
 join_history = []
 RAID_THRESHOLD = 3  # Порог входа (человек)
 RAID_WINDOW = 1    # Промежуток времени (секунд)
+# Списки для хранения истории наказаний (сбрасываются при перезагрузке бота на Render)
+ban_list_history = {}  # {user_id: "имя (причина)"}
+mute_list_history = {} # {user_id: "имя (до какого времени)"}
 
 # --- ВЕБ-СЕРВЕР ---
 async def handle(request):
@@ -109,6 +112,17 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
         action = ""
         finish_time = ""
 
+if is_ban:
+            await bot.ban_chat_member(chat_id, uid)
+            ban_list_history[uid] = f"{name} (Причина: {reason})" # Записываем в бан-лист
+            # ... остальной код ...
+        
+        elif is_warn and warns[uid] == 3:
+            # Когда даем мут на 24 часа
+            until = datetime.now() + timedelta(hours=24)
+            mute_list_history[uid] = f"{name} (до {until.strftime('%d.%m %H:%M')})" # Записываем в мут-лист
+            # ... остальной код ...
+        
         if is_ban:
             await bot.ban_chat_member(chat_id, uid)
             action = "БАН НАВСЕГДА"
@@ -224,6 +238,32 @@ async def cmd_info(message: types.Message):
     )
     await message.answer(text)
 
+@dp.message(Command("banlist"))
+async def cmd_banlist(message: types.Message):
+    if not await is_admin(message): return
+    
+    if not ban_list_history:
+        await message.answer("📁 Чёрный список пуст.")
+        return
+    
+    text = "🚫 **Список забаненных:**\n\n"
+    for uid, info in ban_list_history.items():
+        text += f"• ID: {uid} — {info}\n"
+    await message.answer(text, parse_mode="Markdown")
+
+@dp.message(Command("mutelist"))
+async def cmd_mutelist(message: types.Message):
+    if not await is_admin(message): return
+    
+    if not mute_list_history:
+        await message.answer("🤐 Сейчас никто не замучен.")
+        return
+    
+    text = "🔇 **Список в муте:**\n\n"
+    for uid, info in mute_list_history.items():
+        text += f"• ID: {uid} — {info}\n"
+    await message.answer(text, parse_mode="Markdown")
+
 @dp.message(F.text.lower() == "бот")
 async def bot_status(message: types.Message):
     await message.answer("✅ На месте")
@@ -271,6 +311,8 @@ async def global_mod(message: types.Message):
     # 1. Пропускаем админов и не-текстовые сообщения
     if not message.text or await is_admin(message): 
            return
+
+    uid = message.from_user.id
 
     # 2. Тихое удаление английских букв
     if re.search(r'[a-zA-Z]', message.text):
@@ -386,5 +428,6 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
