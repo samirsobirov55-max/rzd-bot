@@ -116,8 +116,7 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
                 await bot.ban_chat_member(chat_id, uid)
                 ban_list_history[uid] = f"{name} (Причина: {reason})" # Записываем в бан-лист
                 # ... остальной код ...
-            
-                elif is_warn and warns[uid] == 3:
+               elif is_warn and warns[uid] == 3:
                 # Когда даем мут на 24 часа
                 until = datetime.now() + timedelta(hours=24)
                 mute_list_history[uid] = f"{name} (до {until.strftime('%d.%m %H:%M')})" # Записываем в мут-лист
@@ -428,6 +427,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
