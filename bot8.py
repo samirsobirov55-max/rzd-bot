@@ -331,14 +331,15 @@ def run_dummy_server():
     server.serve_forever()
 
 async def main():
-    # 1. Запускаем планировщик (для утренних/вечерних постов)
+    # 1. ДОБАВЬ ЭТУ СТРОКУ (запуск веб-сервера из строки 330-331)
+    import threading
+    threading.Thread(target=lambda: server.serve_forever(), daemon=True).start()
+
+    # 2. Остальное оставляем как было
     scheduler.start()
     logging.info("Планировщик запущен.")
-
-    # 2. Просто уведомляем логгер, что бот готов
     logging.info("Бот запущен и готов к работе!")
 
-    # 3. Запускаем бесконечный опрос Telegram
     try:
         await dp.start_polling(bot)
     finally:
@@ -347,6 +348,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
