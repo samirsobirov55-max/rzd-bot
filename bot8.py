@@ -331,32 +331,23 @@ def run_dummy_server():
     server.serve_forever()
 
 async def main():
-    # 1. Запуск сервера для Render
-    threading.Thread(target=run_dummy_server, daemon=True).start()
-    
-    # 2. Правильный запуск планировщика APScheduler
-    scheduler.start() 
+    # 1. Запускаем планировщик (для утренних/вечерних постов)
+    scheduler.start()
+    logging.info("Планировщик запущен.")
 
-    # 3. Анимированные уведомления (код со скриншота 84)
-    for chat_id in list(active_groups):
-        try:
-            status_msg = await bot.send_message(chat_id, "🔄 Запуск бота...")
-            await asyncio.sleep(2)
-            await status_msg.edit_text("📥 Установка обновлений...")
-            await asyncio.sleep(4)
-            await status_msg.edit_text("⚙️ Проверка плагинов...")
-            await asyncio.sleep(3)
-            await status_msg.edit_text("✅ Бот активен и готов к работе!")
-        except Exception as e:
-            logging.error(f"Ошибка анимации в {chat_id}: {e}")
+    # 2. Просто уведомляем логгер, что бот готов
+    logging.info("Бот запущен и готов к работе!")
 
-    # 4. Запуск прослушки
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    # 3. Запускаем бесконечный опрос Telegram
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await bot.session.close()
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
