@@ -116,14 +116,25 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
         
         elif is_warn:
             warns[uid] = warns.get(uid, 0) + 1
-            if warns[uid] >= 3:
+            
+            if warns[uid] == 3:
+                # ВМЕСТО БАНА ДЕЛАЕМ МУТ НА 24 ЧАСА
+                until = datetime.now() + timedelta(hours=24)
+                finish_time = until.strftime("%d.%m %H:%M")
+                await bot.restrict_chat_member(chat_id, uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
+                action = "МУТ 24ч (3/3 ВАРНА)"
+                await message.answer(f"🤫 Пользователь {name} получил 3/3 варна. Мут на 24 часа!\nПричина: {reason}")
+            
+            elif warns[uid] > 3:
+                # ЕСЛИ НАРУШИЛ ПОСЛЕ МУТА — ТОГДА БАН
                 await bot.ban_chat_member(chat_id, uid)
-                action = "БАН (3/3 ВАРНА)"
-                await message.answer(f"Пользователь {name} забанен за 3/3 предупреждений.\nПричина: {reason}")
+                action = "БАН (РЕЦИДИВ)"
+                await message.answer(f"🚫 Пользователь {name} забанен за повторное нарушение после мута.\nПричина: {reason}")
                 warns[uid] = 0
+            
             else:
                 action = f"ВАРН {warns[uid]}/3"
-                await message.answer(f"Пользователь {name} получил предупреждение {warns[uid]}/3.\nПричина: {reason}")
+                await message.answer(f"⚠️ Пользователь {name} получил предупреждение {warns[uid]}/3.\nПричина: {reason}")
         
         else:
             until = datetime.now() + timedelta(hours=hours)
@@ -361,9 +372,3 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-
-
-
-
-
-
