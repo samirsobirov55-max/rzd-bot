@@ -153,34 +153,6 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
 
 # --- ОБРАБОТЧИКИ ---
 
-# Команда для просмотра списка забаненных
-@dp.message(commands=['banlist']) # <-- Было message_handler, стало message
-async def show_banlist(message: types.Message):
-    if not await is_admin(message): return
-    
-    if not ban_list_history:
-        await message.answer("Список банов пуст. Чисто и спокойно! ✨")
-        return
-        
-    text = "🚫 Список забаненных:\n\n"
-    for uid, info in ban_list_history.items():
-        text += f"• ID {uid}: {info}\n"
-    await message.answer(text, parse_mode="Markdown")
-
-# Команда для просмотра списка мутов
-@dp.message(commands=['mutelist']) # <-- И здесь тоже убираем _handler
-async def show_mutelist(message: types.Message):
-    if not await is_admin(message): return
-    
-    if not mute_list_history:
-        await message.answer("Сейчас никто не молчит. Все общаются! 🗣")
-        return
-        
-    text = "🤫 Список мутов:\n\n"
-    for uid, info in mute_list_history.items():
-        text += f"• ID {uid}: {info}\n"
-    await message.answer(text, parse_mode="Markdown")
-
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     # Работает только в личных сообщениях
@@ -251,6 +223,34 @@ async def cmd_info(message: types.Message):
         
         "Резюме: РЖД — фундамент экономики России, связывающий огромную территорию страны."
     )
+    await message.answer(text)
+
+# Команда для просмотра списка забаненных
+@dp.message(Command("banlist"))
+async def show_banlist(message: types.Message):
+    if not await is_admin(message): return
+    
+    if not ban_list_history:
+        await message.answer("Список банов пуст. Чисто и спокойно! ✨")
+        return
+        
+    text = "Список забаненных:\n\n"
+    for uid, info in ban_list_history.items():
+        text += f"• ID {uid}: {info}\n"
+    await message.answer(text)
+
+# Команда для просмотра списка мутов
+@dp.message(Command("mutelist"))
+async def show_mutelist(message: types.Message):
+    if not await is_admin(message): return
+    
+    if not mute_list_history:
+        await message.answer("Сейчас никто не молчит. Все общаются! 🗣")
+        return
+        
+    text = "Список мутов:\n\n"
+    for uid, info in mute_list_history.items():
+        text += f"• ID {uid}: {info}\n"
     await message.answer(text)
 
 @dp.message(F.text.lower() == "бот")
@@ -417,6 +417,7 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
 
 
