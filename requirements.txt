@@ -2,3 +2,5 @@ aiogram
 apscheduler
 aiohttp
 pytz
+feedparser
+httpx
