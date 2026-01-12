@@ -10,6 +10,7 @@ import os
 import logging
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ChatPermissions, ChatMemberUpdated, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -19,6 +20,8 @@ active_groups = set()
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv('BOT_TOKEN') 
+OWNER_ID = 123456789        # <--- ВСТАВЬ СВОЙ ID СЮДА
+MY_GROUP_ID = -1001234567890  # <--- ВСТАВЬ ID ГРУППЫ СЮДА
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -101,8 +104,8 @@ async def is_admin(message: types.Message):
 
 # --- УНИВЕРСАЛЬНАЯ ФУНКЦИЯ НАКАЗАНИЯ ---
 async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_warn=False):
-    try:  # <--- ЗДЕСЬ ДОЛЖНО БЫТЬ 4 ПРОБЕЛА ПЕРЕД try
-        if await is_admin(message): return  # <--- ЗДЕСЬ 8 ПРОБЕЛОВ (4 + 4 внутри try)
+    try:
+        if await is_admin(message): return
         uid = message.from_user.id
         name = message.from_user.full_name
         chat_id = message.chat.id
@@ -155,7 +158,6 @@ async def punish(message: types.Message, reason: str, hours=0, is_ban=False, is_
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    # Работает только в личных сообщениях
     if message.chat.type == "private":
         builder = InlineKeyboardBuilder()
         bot_info = await bot.get_me()
@@ -200,27 +202,21 @@ async def cmd_info(message: types.Message):
     text = (
         "«РЖД» — это вертикально интегрированный холдинг, являющийся естественной монополией и одной из крупнейших транспортных систем в мире. "
         "Компания была создана 1 октября 2003 года на базе Министерства путей сообщения РФ. Весь пакет акций (100%) принадлежит государству в лице Правительства РФ.\n\n"
-        
         "Масштаб и инфраструктура:\n"
         "Железнодорожная сеть России имеет эксплуатационную длину более 85 000 км, из которых почти половина электрифицирована. "
         "Сеть разделена на 16 территориальных филиалов. Холдинг обеспечивает более 45% всего грузооборота страны и около 30% пассажирских перевозок.\n\n"
-        
         "Основные направления деятельности:\n"
         "- Грузовые перевозки: Главные грузы — уголь, нефть, руда. Приоритет — БАМ и Транссиб.\n"
         "- Пассажирские перевозки: ФПК (дальнее следование), ДОСС (Сапсаны, Ласточки) и пригородные электрички.\n"
         "- Инфраструктурное строительство: Проектирование и стройка путей, мостов и вокзалов.\n\n"
-        
         "Текущее состояние (2025–2026 гг.):\n"
         "В 2026 году инвестпрограмма сфокусирована на безопасности и капремонте. "
         "Продолжается реализация проекта ВСМ-1 (Москва — Санкт-Петербург) со скоростями до 400 км/ч.\n\n"
-        
         "Технологический суверенитет:\n"
         "Переход на отечественные платформы, такие как электропоезд «Финист». Развиваются беспилотное движение на МЦК и квантовые сети.\n\n"
-        
         "Кадровая политика:\n"
         "Более 700 000 сотрудников. РЖД содержит свою сеть больниц, учебных центров и лагерей. "
         "В 2026 году компания активно индексирует зарплаты для привлечения кадров.\n\n"
-        
         "Резюме: РЖД — фундамент экономики России, связывающий огромную территорию страны."
     )
     await message.answer(text)
@@ -229,11 +225,9 @@ async def cmd_info(message: types.Message):
 @dp.message(Command("banlist"))
 async def show_banlist(message: types.Message):
     if not await is_admin(message): return
-    
     if not ban_list_history:
         await message.answer("Список банов пуст. Чисто и спокойно! ✨")
         return
-        
     text = "Список забаненных:\n\n"
     for uid, info in ban_list_history.items():
         text += f"• ID {uid}: {info}\n"
@@ -243,11 +237,9 @@ async def show_banlist(message: types.Message):
 @dp.message(Command("mutelist"))
 async def show_mutelist(message: types.Message):
     if not await is_admin(message): return
-    
     if not mute_list_history:
         await message.answer("Сейчас никто не молчит. Все общаются! 🗣")
         return
-        
     text = "Список мутов:\n\n"
     for uid, info in mute_list_history.items():
         text += f"• ID {uid}: {info}\n"
@@ -261,91 +253,82 @@ async def bot_status(message: types.Message):
 async def anti_raid_welcome(message: types.Message):
     global join_history
     now = time.time()
-    
-    # Очищаем старые записи (старше RAID_WINDOW секунд)
     join_history = [t for t in join_history if now - t < RAID_WINDOW]
-    
     for user in message.new_chat_members:
         if user.id == bot.id:
             await message.answer("Здравствуйте! Назначьте меня администратором для работы.")
             continue
-
         join_history.append(now)
-
-        # Проверка на рейд
         if len(join_history) > RAID_THRESHOLD:
             try:
                 await bot.ban_chat_member(message.chat.id, user.id)
                 await message.answer(f"⚠️ Обнаружена атака! Пользователь {user.full_name} забанен. Причина: Рейдер")
-                
                 log_text = f"Чат: {message.chat.title}\nДействие: БАН (Anti-Raid)\nНарушитель: {user.full_name}\nПричина: Рейдер"
                 await send_log_to_admins(message.chat.id, log_text)
-            except:
-                pass
+            except: pass
         else:
-              try:
-                   await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
-              except Exception as e:
-                # И эта строка тоже
+            try:
+                await message.answer(f"Привет, {user.first_name}! Ознакомься с правилами: /rules")
+            except Exception as e:
                 logging.error(f"Не удалось отправить приветствие: {e}")
+
 @dp.my_chat_member()
 async def on_promoted(event: ChatMemberUpdated):
     if event.new_chat_member.status in ["administrator", "creator"]:
         await bot.send_message(event.chat.id, "Права получены! Начинаю следить за порядком.")
 
+@dp.message(Command("id"))
+async def get_id(message: types.Message):
+    await message.answer(f"ID этого чата: {message.chat.id}\nТвой ID: {message.from_user.id}")
+
 @dp.message()
 async def global_mod(message: types.Message):
+    # Хендлер копирования для Владельца (в личке)
+    if message.chat.type == "private" and message.from_user.id == OWNER_ID:
+        if message.text and message.text.startswith("/"):
+            pass # Если команда, идем дальше к проверкам команд
+        else:
+            try:
+                await message.copy_to(chat_id=MY_GROUP_ID)
+                await message.delete()
+                return
+            except Exception as e:
+                await message.answer(f"❌ Ошибка копирования: {e}")
+                return
+
     if message.chat.type in ['group', 'supergroup']:
         active_groups.add(message.chat.id)
-    # 1. Пропускаем админов и не-текстовые сообщения
     if not message.text or await is_admin(message): 
            return
 
     uid = message.from_user.id
-
-    # 2. Тихое удаление английских букв
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
             return
-        except:
-            return
+        except: return
 
-    # 3. Подготовка текста для проверки матов и спама
-    # 3. Подготовка текста
     text = message.text.lower()
-    
-    # Создаем версию текста ВООБЩЕ БЕЗ пробелов и знаков
     super_clean_text = re.sub(r"[^а-яё]", "", text) 
 
     if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
         await punish(message, "Мошенничество (Пункт 5)", is_ban=True)
         return
-
     if "http" in text or "t.me/" in text:
         await punish(message, "Реклама (Пункт 7)", hours=24)
         return
-
     if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
         await punish(message, "Политика (Пункт 4)", hours=6)
         return
-
     if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
         await punish(message, "Обсуждение действий администрации (Пункт 9)", hours=12)
         return
-
-    # Проверка на слова для МГНОВЕННОГО БАНА
     if re.search(r"\bшлюх\w*\b", text):
         await punish(message, "Тяжелые оскорбления (БАН)", is_ban=True)
         return
     
-   # Проверка обычных матов
-    # Проверяем каждое слово из списка BAD_WORDS (убрав из них знаки \b)
     for pattern in BAD_WORDS:
-        # Убираем технические символы регулярки для простой проверки
-        # Убираем ВСЕ технические символы, оставляя только чистые русские буквы
         base_word = re.sub(r"[^а-яё]", "", pattern.replace(r"\b", "").replace(r"\w*", ""))
-        
         if base_word and base_word in super_clean_text:
             await punish(message, "Использование мата (Пункт 1)", is_warn=True)
             return
@@ -357,54 +340,30 @@ async def global_mod(message: types.Message):
     user_messages[uid] = now
 
 # --- ЗАПУСК ---
-# Функция, которая будет отправлять сообщения
 async def send_scheduled_msg(mode):
-    if not active_groups:
-        return
-    
+    if not active_groups: return
     morning_texts = ["☀️ Доброе утро, чат! Просыпаемся! ☕", "🌅 Всем прекрасного утра! ✨"]
     night_texts = ["🌙 Время 22:00. Всем спокойной ночи! 😴", "🌃 Пора отдыхать, доброй ночи! 💤"]
-    
     text = random.choice(morning_texts if mode == "morning" else night_texts)
-    
     for chat_id in list(active_groups):
-        try:
-            await bot.send_message(chat_id, text)
-        except:
-            active_groups.discard(chat_id)
+        try: await bot.send_message(chat_id, text)
+        except: active_groups.discard(chat_id)
 
-# Настройка будильника по МСК
 scheduler = AsyncIOScheduler(timezone=timezone("Europe/Moscow"))
 scheduler.add_job(send_scheduled_msg, "cron", hour=8, minute=0, args=["morning"])
 scheduler.add_job(send_scheduled_msg, "cron", hour=22, minute=0, args=["night"])
 
-def run_dummy_server():
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            self.send_response(200)
-            self.end_headers()
-    server = HTTPServer(('0.0.0.0', 10000), Handler)
-    server.serve_forever()
-
 async def main():
-    # 1. Создаем сервер прямо здесь, чтобы он был доступен
-    from http.server import HTTPServer, BaseHTTPRequestHandler
-    import threading
-
     class SimpleHandler(BaseHTTPRequestHandler):
         def do_GET(self):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"Bot is running")
 
-    # Создаем объект сервера
     httpd = HTTPServer(('0.0.0.0', 10000), SimpleHandler)
-    
-    # Запускаем его в отдельном потоке
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     logging.info("Фоновый веб-сервер запущен на порту 10000")
 
-    # 2. Остальной твой код
     scheduler.start()
     logging.info("Планировщик запущен.")
     logging.info("Бот запущен и готов к работе!")
@@ -415,8 +374,8 @@ async def main():
         await bot.session.close()
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
+
 
 
 
