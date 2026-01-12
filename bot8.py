@@ -1,3 +1,5 @@
+import feedparser
+import httpx
 import random
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pytz import timezone
@@ -82,6 +84,38 @@ BAD_WORDS = [
     r"\bпенис\b", r"\bпедикулез\b", r"\bспид\b", r"\bгероин\b", r"\bнаркот\w*\b", 
     r"\bнахуй\w*\b", r"\bнах\w*\b", r"\bипан\w*\b", r"\bиба\w*\b", r"\сосешь\w*\b"
 ]
+
+# --- НАСТРОЙКИ НОВОСТЕЙ РЖД ---
+BAD_NEWS_KEYWORDS = ["задерж", "отмен", "авари", "техническ", "сбой", "ремонт", "изменен", "ограничен"]
+last_news_url = None
+
+async def check_rjd_news():
+    global last_news_url
+    rss_url = "https://press.rzd.ru/ru/707/page/1032?type_id=1"
+    try:
+        # Используем httpx для обхода простых защит сайта
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(rss_url, timeout=10.0)
+            feed = feedparser.parse(resp.text)
+        
+        if not feed.entries: return
+
+        latest_post = feed.entries[0]
+        title = latest_post.title.lower()
+        link = latest_post.link
+
+        if last_news_url != link:
+            last_news_url = link
+            # Если в заголовке есть "плохое" слово из списка
+            if any(word in title for word in BAD_NEWS_KEYWORDS):
+                text = f"🚨 **Оперативная информация РЖД**\n\n{latest_post.title}\n\n🔗 [Читать полностью]({link})"
+                # Рассылаем по всем чатам, которые бот запомнил
+                for chat_id in list(active_groups):
+                    try:
+                        await bot.send_message(chat_id, text, parse_mode="Markdown")
+                    except: pass
+    except Exception as e:
+        logging.error(f"Ошибка при проверке новостей РЖД: {e}")
 
 # --- ЛОГИРОВАНИЕ ДЛЯ ВСЕХ АДМИНОВ ---
 async def send_log_to_admins(chat_id, log_text):
@@ -349,9 +383,18 @@ async def send_scheduled_msg(mode):
         try: await bot.send_message(chat_id, text)
         except: active_groups.discard(chat_id)
 
+# Настройка планировщика (оставляем один раз)
 scheduler = AsyncIOScheduler(timezone=timezone("Europe/Moscow"))
+
+# Задания для доброго утра и спокойной ночи
 scheduler.add_job(send_scheduled_msg, "cron", hour=8, minute=0, args=["morning"])
 scheduler.add_job(send_scheduled_msg, "cron", hour=22, minute=0, args=["night"])
+
+# Задание для проверки новостей РЖД (каждые 30 минут)
+scheduler.add_job(check_rjd_news, "interval", minutes=30)
+
+# ВОТ ЭТУ СТРОКУ ДОБАВЬ:
+scheduler.add_job(check_rjd_news, "interval", minutes=30)
 
 async def main():
     class SimpleHandler(BaseHTTPRequestHandler):
@@ -375,6 +418,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
