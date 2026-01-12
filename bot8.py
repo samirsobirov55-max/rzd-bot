@@ -20,8 +20,8 @@ active_groups = set()
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv('BOT_TOKEN') 
-OWNER_ID = 123456789        # <--- ВСТАВЬ СВОЙ ID СЮДА
-MY_GROUP_ID = -1001234567890  # <--- ВСТАВЬ ID ГРУППЫ СЮДА
+OWNER_ID = 7913733869        # <--- ВСТАВЬ СВОЙ ID СЮДА
+MY_GROUP_ID = -1002974508454  # <--- ВСТАВЬ ID ГРУППЫ СЮДА
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
@@ -375,6 +375,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
