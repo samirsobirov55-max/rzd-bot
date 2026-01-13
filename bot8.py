@@ -717,13 +717,9 @@ async def global_mod(message: types.Message):
             await punish(message, "Использование мата (Пункт 1)", is_warn=True)
             return
 
-    # Защита от спама (флуда)
+import time
     now = time.time()
-    if uid in user_messages and now - user_messages[uid] < 0.7:
-        await punish(message, "Спам/Флуд (Пункт 2)", hours=1)
-        return
-user_messages[uid] = now
-
+    user_messages[uid] = now
 # --- ПЛАНИРОВЩИК И РАССЫЛКИ ---
 async def send_scheduled_msg(mode):
     if not active_groups: return
@@ -765,3 +761,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
