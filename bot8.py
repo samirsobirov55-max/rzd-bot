@@ -711,7 +711,7 @@ async def global_mod(message: types.Message):
         await punish(message, "Тяжелые оскорбления (БАН)", is_ban=True)
         return
     
-for pattern in BAD_WORDS:
+    for pattern in BAD_WORDS:
         if re.search(pattern, text):
             await punish(message, "Использование мата (Пункт 1)", is_warn=True)
             return
@@ -760,4 +760,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
