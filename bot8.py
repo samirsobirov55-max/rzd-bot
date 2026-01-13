@@ -1,5 +1,6 @@
 import feedparser
 import httpx
+from bs4 import BeautifulSoup
 import random
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pytz import timezone
@@ -116,6 +117,30 @@ async def check_rjd_news():
                     except: pass
     except Exception as e:
         logging.error(f"Ошибка при проверке новостей РЖД: {e}")
+
+async def check_roblox_updates():
+    global last_roblox_post_id
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get("https://t.me/s/roblru", timeout=10.0)
+            if response.status_code == 200:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(response.text, 'html.parser')
+                posts = soup.find_all('div', class_='tgme_widget_message_wrap')
+                if not posts: return
+                
+                last_post = posts[-1]
+                post_link_tag = last_post.find('a', class_='tgme_widget_message_date')
+                if post_link_tag:
+                    post_url = post_link_tag['href']
+                    if last_roblox_post_id != post_url:
+                        last_roblox_post_id = post_url
+                        for chat_id in list(active_groups):
+                            try:
+                                await bot.send_message(chat_id, f"🎮 **Новый пост в Roblox RU:**\n\n{post_url}")
+                            except: pass
+    except Exception as e:
+        logging.error(f"Ошибка Roblox: {e}")
 
 # --- ЛОГИРОВАНИЕ ДЛЯ ВСЕХ АДМИНОВ ---
 async def send_log_to_admins(chat_id, log_text):
@@ -382,19 +407,17 @@ async def send_scheduled_msg(mode):
     for chat_id in list(active_groups):
         try: await bot.send_message(chat_id, text)
         except: active_groups.discard(chat_id)
-
-# Настройка планировщика (оставляем один раз)
+# Оставь только эти строки в блоке планировщика:
 scheduler = AsyncIOScheduler(timezone=timezone("Europe/Moscow"))
 
-# Задания для доброго утра и спокойной ночи
 scheduler.add_job(send_scheduled_msg, "cron", hour=8, minute=0, args=["morning"])
 scheduler.add_job(send_scheduled_msg, "cron", hour=22, minute=0, args=["night"])
 
-# Задание для проверки новостей РЖД (каждые 30 минут)
+# Проверка РЖД (ОСТАВЬ ТОЛЬКО ОДНУ СТРОКУ)
 scheduler.add_job(check_rjd_news, "interval", minutes=30)
 
-# ВОТ ЭТУ СТРОКУ ДОБАВЬ:
-scheduler.add_job(check_rjd_news, "interval", minutes=30)
+# Проверка Roblox (ОСТАВЬ ТОЛЬКО ОДНУ СТРОКУ)
+scheduler.add_job(check_roblox_updates, "interval", minutes=10)
 
 async def main():
     class SimpleHandler(BaseHTTPRequestHandler):
@@ -418,6 +441,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
