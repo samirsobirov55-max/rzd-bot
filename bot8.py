@@ -251,51 +251,55 @@ ANECDOTES = [
 # --- НАСТРОЙКИ НОВОСТЕЙ РЖД ---
 BAD_NEWS_KEYWORDS = ["задерж", "отмен", "авари", "техническ", "сбой", "ремонт", "изменен", "ограничен"]
 last_news_url = None
-last_roblox_post_id = None
+last_roblox_post_id = None  # Переменная возвращена на место
 
 async def check_rjd_news():
     global last_news_url
-    rss_url = "https://press.rzd.ru/ru/707/page/1032?type_id=1"
+    # Ссылка на РИА Новости для стабильности
+    url = "https://ria.ru/organization_Rossijjskie_zheleznye_dorogi/"
     
-    # Максимальная маскировка под реальный браузер
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
     
     try:
-        # Используем limits, чтобы не частить с запросами
         async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=20.0) as client:
-            resp = await client.get(rss_url)
+            resp = await client.get(url)
             
             if resp.status_code != 200:
-                logging.error(f"РЖД статус: {resp.status_code}")
+                logging.error(f"РИА Новости статус: {resp.status_code}")
                 return
 
-            # Парсим содержимое
-            feed = feedparser.parse(resp.text)
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(resp.text, 'html.parser')
             
-        if not feed or not feed.entries:
-            return
+            # Находим заголовок первой новости
+            first_news = soup.find('a', class_='list-item__title')
+            
+            if not first_news:
+                return
 
-        latest_post = feed.entries[0]
-        title = latest_post.title.lower()
-        link = latest_post.link
+            title_text = first_news.get_text(strip=True)
+            link = first_news.get('href')
 
-        if last_news_url != link:
-            last_news_url = link
-            if any(word in title for word in BAD_NEWS_KEYWORDS):
-                text = f"🚨 **Оперативная информация РЖД**\n\n{latest_post.title}\n\n🔗 [Читать полностью]({link})"
-                for chat_id in list(active_groups):
-                    try:
-                        await bot.send_message(chat_id, text, parse_mode="Markdown")
-                    except Exception as e:
-                        logging.error(f"Ошибка отправки: {e}")
-                        
+            # Если ссылка новая, проверяем на плохие новости
+            if last_news_url != link:
+                last_news_url = link
+                title_lower = title_text.lower()
+                
+                if any(word in title_lower for word in BAD_NEWS_KEYWORDS):
+                    # Чистый текст без жирного шрифта и Markdown
+                    text = f"ОПЕРАТИВНАЯ ИНФОРМАЦИЯ РЖД\n\n{title_text}\n\nСсылка: {link}"
+                    
+                    for chat_id in list(active_groups):
+                        try:
+                            # Отправляем как обычный текст, чтобы не было ошибок парсинга
+                            await bot.send_message(chat_id, text)
+                        except Exception as e:
+                            logging.error(f"Ошибка отправки сообщения: {e}")
+                            
     except Exception as e:
-        # Выводим не только текст ошибки, но и её ТИП
-        logging.error(f"Детальная ошибка РЖД ({type(e).__name__}): {e}")
+        logging.error(f"Детальная ошибка РИА ({type(e).__name__}): {e}")
 
 async def check_roblox_updates():
     global last_roblox_post_id
@@ -760,5 +764,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
