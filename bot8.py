@@ -711,15 +711,14 @@ async def global_mod(message: types.Message):
         await punish(message, "Тяжелые оскорбления (БАН)", is_ban=True)
         return
     
-    # Обычный мат из списка BAD_WORDS
-    for pattern in BAD_WORDS:
+for pattern in BAD_WORDS:
         if re.search(pattern, text):
             await punish(message, "Использование мата (Пункт 1)", is_warn=True)
             return
 
-import time
-    now = time.time()
-    user_messages[uid] = now
+   import time
+   now = time.time()
+   user_messages[uid] = now
 # --- ПЛАНИРОВЩИК И РАССЫЛКИ ---
 async def send_scheduled_msg(mode):
     if not active_groups: return
@@ -761,4 +760,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
-
