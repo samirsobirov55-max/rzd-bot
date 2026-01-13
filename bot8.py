@@ -30,12 +30,14 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-user_warns = {}        
-user_mute_level = {}   
-active_groups = set()
-
-# Новые переменные для защиты от рейдов:
-join_history = []
+# --- ИНИЦИАЛИЗАЦИЯ СЛОВАРЕЙ (ВСТАВЬ ЭТО В НАЧАЛО ФАЙЛА) ---
+# --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ (ДОЛЖНЫ БЫТЬ ТУТ) ---
+user_messages = {}     # Исправляет твою ошибку 'user_messages is not defined'
+user_warns = {}        # Для хранения количества варнов
+user_mute_level = {}   # Для прогрессии мутов
+active_groups = set()  # Список ID групп для новостей
+join_history = []      # Для защиты от рейдов
+sent_news = []         # Чтобы новости не дублировались
 RAID_THRESHOLD = 3  # Порог входа (человек)
 RAID_WINDOW = 1    # Промежуток времени (секунд)
 # Списки для хранения истории наказаний (сбрасываются при перезагрузке бота на Render)
@@ -346,6 +348,9 @@ async def is_admin(message: types.Message):
 
 # --- УНИВЕРСАЛЬНАЯ ФУНКЦИЯ НАКАЗАНИЯ ---
 async def punish(message: types.Message, reason: str):
+    # Добавляем доступ к глобальным словарям, чтобы не было ошибки NameError
+    global user_warns, user_mute_level
+    
     try:
         uid = message.from_user.id
         chat_id = message.chat.id
@@ -393,7 +398,7 @@ async def punish(message: types.Message, reason: str):
         await message.answer(f"МУТ на {minutes} мин.: {user_name}\nПричина: 3/3 варна ({reason})")
 
     except Exception as e:
-        logging.error(f"Ошибка автоматики: {e}")
+        logging.error(f"Ошибка автоматики в punish: {e}")
 # Функция, которая рассылает анекдот во все чаты
 async def send_joke_to_all_groups():
     if not active_groups:
@@ -762,6 +767,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
