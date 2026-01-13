@@ -1,6 +1,6 @@
 aiogram
 apscheduler
-aiohttp
 pytz
-feedparser
 httpx
+feedparser
+beautifulsoup4
