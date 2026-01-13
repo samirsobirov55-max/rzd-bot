@@ -95,22 +95,25 @@ async def check_rjd_news():
     global last_news_url
     rss_url = "https://press.rzd.ru/ru/707/page/1032?type_id=1"
     
-    # Добавляем заголовки, чтобы сайт думал, что мы - человек
+    # Максимальная маскировка под реальный браузер
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     }
     
     try:
-        async with httpx.AsyncClient(headers=headers, follow_redirects=True) as client:
-            resp = await client.get(rss_url, timeout=15.0)
+        # Используем limits, чтобы не частить с запросами
+        async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=20.0) as client:
+            resp = await client.get(rss_url)
             
-            # Проверяем статус ответа
             if resp.status_code != 200:
-                logging.error(f"РЖД вернул код: {resp.status_code}")
+                logging.error(f"РЖД статус: {resp.status_code}")
                 return
 
+            # Парсим содержимое
             feed = feedparser.parse(resp.text)
-        
+            
         if not feed or not feed.entries:
             return
 
@@ -125,10 +128,12 @@ async def check_rjd_news():
                 for chat_id in list(active_groups):
                     try:
                         await bot.send_message(chat_id, text, parse_mode="Markdown")
-                    except Exception as send_err:
-                        logging.error(f"Ошибка отправки новости в {chat_id}: {send_err}")
+                    except Exception as e:
+                        logging.error(f"Ошибка отправки: {e}")
+                        
     except Exception as e:
-        logging.error(f"Детальная ошибка РЖД: {e}")
+        # Выводим не только текст ошибки, но и её ТИП
+        logging.error(f"Детальная ошибка РЖД ({type(e).__name__}): {e}")
 
 async def check_roblox_updates():
     global last_roblox_post_id
@@ -453,6 +458,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
