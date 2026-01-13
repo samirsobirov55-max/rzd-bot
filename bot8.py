@@ -89,6 +89,7 @@ BAD_WORDS = [
 # --- НАСТРОЙКИ НОВОСТЕЙ РЖД ---
 BAD_NEWS_KEYWORDS = ["задерж", "отмен", "авари", "техническ", "сбой", "ремонт", "изменен", "ограничен"]
 last_news_url = None
+last_roblox_post_id = None
 
 async def check_rjd_news():
     global last_news_url
@@ -441,6 +442,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
