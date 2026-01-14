@@ -664,16 +664,15 @@ async def global_mod(message: types.Message):
     text = message.text.lower()
 
     # Удаление любой английской буквы
+uid = message.from_user.id
+    text = message.text.lower()
+
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
             return
         except:
             return
-    # ВОТ ЗДЕСЬ ВСЁ ДОЛЖНО БЫТЬ В ОДНУ ЛИНИЮ:
-    uid = message.from_user.id
-    text = message.text.lower()
-
     # 5. Мошенничество (БАН)
     if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
         await punish(message, "Мошенничество", is_ban=True)
@@ -749,6 +748,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
