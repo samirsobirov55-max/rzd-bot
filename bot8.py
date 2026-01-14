@@ -401,6 +401,7 @@ async def punish(message: types.Message, reason: str):
         logging.error(f"Ошибка автоматики в punish: {e}")
 # Функция, которая рассылает анекдот во все чаты
 async def send_joke_to_all_groups():
+    global active_groups
     if not active_groups:
         return
     
@@ -728,6 +729,7 @@ async def global_mod(message: types.Message):
     user_messages[uid] = now
 # --- ПЛАНИРОВЩИК И РАССЫЛКИ ---
 async def send_scheduled_msg(mode):
+    global active_groups
     if not active_groups: return
     morning_texts = ["☀️ Доброе утро, чат! Просыпаемся! ☕", "🌅 Всем прекрасного утра! ✨"]
     night_texts = ["🌙 Время 22:00. Всем спокойной ночи! 😴", "🌃 Пора отдыхать, доброй ночи! 💤"]
@@ -744,6 +746,8 @@ scheduler.add_job(send_scheduled_msg, "cron", hour=8, minute=0, args=["morning"]
 scheduler.add_job(send_scheduled_msg, "cron", hour=22, minute=0, args=["night"])
 scheduler.add_job(check_rjd_news, "interval", minutes=30)
 scheduler.add_job(check_roblox_updates, "interval", minutes=10)
+scheduler.add_job(send_joke_to_all_groups, "interval", hours=1)
+scheduler.start()
 # Строку со списком мутов (send_mute_list) МЫ УДАЛИЛИ ОТСЮДА
 
 # --- ЗАПУСК ---
@@ -767,6 +771,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
