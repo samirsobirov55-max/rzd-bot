@@ -19,17 +19,6 @@ from aiogram.types import ChatPermissions, ChatMemberUpdated, InlineKeyboardButt
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import ChatMemberUpdatedFilter
 from aiohttp import web
-active_groups = load_groups()
-
-# --- НАСТРОЙКИ ---
-TOKEN = os.getenv('BOT_TOKEN') 
-OWNER_ID = 7913733869        # <--- ВСТАВЬ СВОЙ ID СЮДА
-MY_GROUP_ID = -1002974508454  # <--- ВСТАВЬ ID ГРУППЫ СЮДА
-
-logging.basicConfig(level=logging.INFO)
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
-
 def save_groups(groups):
     with open("groups.txt", "w") as f:
         for gid in groups:
@@ -40,10 +29,18 @@ def load_groups():
         with open("groups.txt", "r") as f:
             return set(int(line.strip()) for line in f if line.strip())
     except FileNotFoundError:
-        return set()
+        return {-1002340798207}
 
-# Инициализируем группы из файла
-active_groups = load_groups()
+active_groups = load_groups() # Сразу загружаем при старте
+
+# --- НАСТРОЙКИ ---
+TOKEN = os.getenv('BOT_TOKEN') 
+OWNER_ID = 7913733869        # <--- ВСТАВЬ СВОЙ ID СЮДА
+MY_GROUP_ID = -1002974508454  # <--- ВСТАВЬ ID ГРУППЫ СЮДА
+
+logging.basicConfig(level=logging.INFO)
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
 
 # --- ИНИЦИАЛИЗАЦИЯ СЛОВАРЕЙ (ВСТАВЬ ЭТО В НАЧАЛО ФАЙЛА) ---
 # --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ (ДОЛЖНЫ БЫТЬ ТУТ) ---
@@ -576,11 +573,15 @@ async def get_id(message: types.Message):
 
 @dp.message()
 async def global_mod(message: types.Message):
+    # 1. Проверка на админа
+    if not message.text or await is_admin(message): 
+        return
+
+    # Добавление группы в список и сохранение
     if message.chat.type in ['group', 'supergroup']:
         if message.chat.id not in active_groups:
             active_groups.add(message.chat.id)
-            save_groups(active_groups) # СОХРАНЯЕМ СРАЗУ
-    # 1. Проверка на админа
+            save_groups(active_groups)
     if not message.text or await is_admin(message): 
         return
 
@@ -765,3 +766,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
