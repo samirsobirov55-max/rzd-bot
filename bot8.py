@@ -19,6 +19,9 @@ from aiogram.types import ChatPermissions, ChatMemberUpdated, InlineKeyboardButt
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import ChatMemberUpdatedFilter
 from aiohttp import web
+
+# ... тут твои импорты (import os, import logging и т.д.) ...
+
 def save_groups(groups):
     with open("groups.txt", "w") as f:
         for gid in groups:
@@ -31,7 +34,10 @@ def load_groups():
     except FileNotFoundError:
         return {-1002340798207}
 
-active_groups = load_groups() # Сразу загружаем при старте
+# Инициализируем список групп сразу при запуске
+active_groups = load_groups()
+
+# Дальше идет твой код: bot = Bot(token=TOKEN) и так далее
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv('BOT_TOKEN') 
@@ -766,4 +772,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
