@@ -96,7 +96,7 @@ BAD_WORDS = [
     r"\bсекс\b", r"\bчлен\b", r"\bсиськ\w*\b", r"\bхентай\b", r"\bтрах\w*\b",
     r"\bсосать\b", r"\bминет\b", r"\bголая\b", r"\bголый\b", r"\bвлагалищ\w*\b",
     r"\bпенис\b", r"\bпедикулез\b", r"\bспид\b", r"\bгероин\b", r"\bнаркот\w*\b", 
-    r"\bнахуй\w*\b", r"\bнах\w*\b", r"\bипан\w*\b", r"\bиба\w*\b", r"\сосешь\w*\b", r"\ахуе\w*\b", r"\вахуе\w*\b"
+    r"\bнахуй\w*\b", r"\bнах\w*\b", r"\bипан\w*\b", r"\bиба\w*\b", r"\сосешь\w*\b", r"\ахуе\w*\b", r"\вахуе\w*\b", r"\ху\w*\b", r"\бля\w*\b"
 ]
 
 ANECDOTES = [
@@ -609,7 +609,7 @@ async def global_mod(message: types.Message):
         return
 
     # 5. ПРОВЕРКА НА МАТЫ (СИСТЕМА ВАРНОВ И ПРОГРЕССИВНЫХ МУТОВ)
-    # Используем re.search для каждого паттерна из твоего списка BAD_WORDS
+    # 5. ПРОВЕРКА НА МАТЫ (СИСТЕМА ВАРНОВ И ПРОГРЕССИВНЫХ МУТОВ)
     is_bad = False
     for pattern in BAD_WORDS:
         if re.search(pattern, text):
@@ -617,33 +617,44 @@ async def global_mod(message: types.Message):
             break
             
     if is_bad:
-        user_warns[uid] = user_warns.get(uid, 0) + 1
+        # СОЗДАЕМ ИМЯ ОДИН РАЗ ЗДЕСЬ
+        user_full_name = message.from_user.full_name
+        uid = message.from_user.id
+        mutes = user_mutes_count.get(uid, 0)
         
-        if user_warns[uid] < 3:
-            await message.reply(f"⚠️ Предупреждение ({user_warns[uid]}/3)! Не матерись.")
-            try: await message.delete()
+        # Если юзера еще НИ РАЗУ не мутили, используем систему варнов (3 шанса)
+        if mutes == 0:
+            user_warns[uid] = user_warns.get(uid, 0) + 1
+            if user_warns[uid] < 3:
+                # Использование имени в варне
+                await message.reply(f"⚠️ Предупреждение {user_full_name} ({user_warns[uid]}/3)! Не матерись.")
+                try: await message.delete()
+                except: pass
+                return 
+            else:
+                user_warns[uid] = 0 # Сбрасываем варны перед первым мутом
+        
+        # ЛОГИКА МУТА
+        minutes = 5 * (2 ** mutes)
+        
+        if minutes >= 1440: # Больше 24 часов -> БАН
+            try:
+                await message.chat.ban(uid)
+                # Использование имени в бане
+                await message.answer(f"🚫 {user_full_name} забанен за рецидив!")
             except: pass
         else:
-            user_warns[uid] = 0 
-            mutes = user_mutes_count.get(uid, 0)
-            minutes = 5 * (2 ** mutes)
-            
-            if minutes >= 1440: # Больше суток -> БАН
-                try:
-                    await message.chat.ban(uid)
-                    await message.answer(f"🚫 {message.from_user.first_name} забанен за рецидив!")
-                except: pass
-            else:
-                until = datetime.now() + timedelta(minutes=minutes)
-                try:
-                    await message.chat.restrict(uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
-                    user_mutes_count[uid] = mutes + 1 
-                    await message.answer(f"🔇 {message.from_user.first_name} мут на {minutes} мин. (Нарушение #3)")
-                    await message.delete()
-                except: pass
-        return # Важно! Выходим, чтобы не проверять на политику и т.д.
+            until = datetime.now() + timedelta(minutes=minutes)
+            try:
+                await message.chat.restrict(uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
+                user_mutes_count[uid] = mutes + 1 
+                # Использование имени в муте
+                await message.answer(f"🔇 {user_full_name} наказан на {minutes} мин. за мат.")
+                await message.delete()
+            except: pass
+        return
 
-    # 6. Политика, Админы и Спам (оставь как было)
+    # 6. Политика, Админы и Спам
     if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
         await punish(message, "Политика")
         return
@@ -790,6 +801,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
