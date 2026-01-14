@@ -366,6 +366,7 @@ async def punish(message: types.Message, reason: str, is_ban: bool = False):
         if is_ban:
             await bot.ban_chat_member(chat_id, uid)
             await message.answer(f"🚫 БАН: {user_name}\nПричина: {reason}")
+            ban_list_history[uid] = f"Бан за: {reason}" # Добавь вот это!
             return
 
         # --- НАКОПИТЕЛЬНАЯ СИСТЕМА ВАРНОВ ---
@@ -554,11 +555,11 @@ async def get_id(message: types.Message):
 
 @dp.message()
 async def global_mod(message: types.Message):
-    # 1. Проверка на админа
+    # 1. Проверка на админа (отступ 4 пробела)
     if not message.text or await is_admin(message): 
         return
 
-    # 2. ВОТ ЗДЕСЬ должен быть английский (на том же уровне, что и if выше)
+    # 2. Английские буквы (отступ 4 пробела)
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
@@ -566,14 +567,15 @@ async def global_mod(message: types.Message):
         except:
             return
 
-    # 3. Дальше весь остальной код...
+    # 3. Подготовка текста (отступ 4 пробела)
     uid = message.from_user.id
     text = message.text.lower()
-    
-        # --- ВОТ СЮДА ПЕРЕНЕСИ ЭТИ СТРОКИ ---
-        if "http" in text or "t.me/" in text:
-            await punish(message, "Реклама", is_ban=True)
-            return
+
+    # 4. Проверка на ссылки (СТРОКА 574 - ЗДЕСЬ БЫЛА ОШИБКА)
+    # Убедись, что перед 'if' ровно 4 пробела!
+    if "http" in text or "t.me/" in text:
+        await punish(message, "Реклама", is_ban=True)
+        return
     
         if re.search(r"\bшлюх\w*\b", text):
             await punish(message, "Тяжелые оскорбления", is_ban=True)
@@ -767,6 +769,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
