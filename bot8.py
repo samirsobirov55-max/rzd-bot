@@ -587,14 +587,14 @@ async def get_id(message: types.Message):
             return
     
         # Политика
-        if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
-            await punish(message, "Политика")
-            return
+    if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
+        await punish(message, "Политика") # Только причина, без лишних запятых
+        return
     
-        # Оскорбление админа/бота
-        if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
-            await punish(message, "Обсуждение действий администрации")
-            return
+    # Оскорбление админа/бота
+    if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
+        await punish(message, "Обсуждение действий администрации") # Только причина
+        return
         
         # Обычный мат из списка BAD_WORDS
         for pattern in BAD_WORDS:
@@ -763,4 +763,5 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
