@@ -569,14 +569,13 @@ async def get_id(message: types.Message):
         if re.search(r"\bшлюх\w*\b", text):
             await punish(message, "Тяжелые оскорбления", is_ban=True)
             return
-        # --- ФИЛЬТРЫ МОДЕРАЦИИ ---
     
-        # Проверка на латиницу (только если длинное слово)
-        if re.search(r'[a-zA-Z]{6,}', message.text):
-            try:
-                await message.delete()
-                return # Удаляем и выходим
-            except: return
+    if re.search(r'[a-zA-Z]', message.text):
+        try:
+            await message.delete()
+            return # Удаляем и выходим, варн не даем
+        except:
+            return
     
         # Очистка текста для поиска скрытого мата
         super_clean_text = re.sub(r"[^а-яё]", "", text) 
@@ -763,5 +762,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
