@@ -663,13 +663,15 @@ async def global_mod(message: types.Message):
     if not message.text or await is_admin(message): 
         return
 
-    # 4. Удаление ЛЮБЫХ английских букв (без варна)
+    # 4. Удаление ЛЮБЫХ английских букв
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
             return 
-        except: return
+        except:
+            return
 
+    # ВОТ ЗДЕСЬ ВСЁ ДОЛЖНО БЫТЬ В ОДНУ ЛИНИЮ:
     uid = message.from_user.id
     text = message.text.lower()
 
@@ -682,7 +684,6 @@ async def global_mod(message: types.Message):
     if "http" in text or "t.me/" in text:
         await punish(message, "Реклама", is_ban=True)
         return
-
     # 7. Тяжелый мат (БАН)
     if re.search(r"\bшлюх\w*\b", text):
         await punish(message, "Тяжелые оскорбления", is_ban=True)
@@ -749,6 +750,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
