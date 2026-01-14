@@ -555,11 +555,11 @@ async def get_id(message: types.Message):
 
 @dp.message()
 async def global_mod(message: types.Message):
-    # 1. Проверка на админа (отступ 4 пробела)
+    # 1. Проверка на админа
     if not message.text or await is_admin(message): 
         return
 
-    # 2. Английские буквы (отступ 4 пробела)
+    # 2. Удаление английских букв
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
@@ -567,58 +567,46 @@ async def global_mod(message: types.Message):
         except:
             return
 
-    # 3. Подготовка текста (отступ 4 пробела)
     uid = message.from_user.id
     text = message.text.lower()
 
-    # 4. Проверка на ссылки (СТРОКА 574 - ЗДЕСЬ БЫЛА ОШИБКА)
-    # Убедись, что перед 'if' ровно 4 пробела!
+    # 3. Проверка на ссылки (СТРОКА 574 - БОЛЬШЕ НЕТ ОШИБКИ)
     if "http" in text or "t.me/" in text:
         await punish(message, "Реклама", is_ban=True)
         return
-    
-        if re.search(r"\bшлюх\w*\b", text):
-            await punish(message, "Тяжелые оскорбления", is_ban=True)
-            return
-    
-    if re.search(r'[a-zA-Z]', message.text):
-        try:
-            await message.delete()
-            return # Удаляем и выходим, варн не даем
-        except:
-            return
-    
-        # Очистка текста для поиска скрытого мата
-        super_clean_text = re.sub(r"[^а-яё]", "", text) 
-    
-        # Мошенничество
-        if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
-            await punish(message, "Мошенничество", is_ban=True)
-            return
-    
-        # Политика
-    if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
-        await punish(message, "Политика") # Только причина, без лишних запятых
-        return
-    
-    # Оскорбление админа/бота
-    if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
-        await punish(message, "Обсуждение действий администрации") # Только причина
-        return
-        
-        # Обычный мат из списка BAD_WORDS
-        for pattern in BAD_WORDS:
-            if re.search(pattern, text):
-                await punish(message, "Использование мата")
-                return
-    
-        # Защита от спама (флуда)
-        now = time.time()
-        if uid in user_messages and now - user_messages[uid] < 0.7:
-            await punish(message, "Спам/Флуд")
-            return
-        user_messages[uid] = now
 
+    # 4. Проверка на мат "шлюх"
+    if re.search(r"\bшлюх\w*\b", text):
+        await punish(message, "Тяжелые оскорбления", is_ban=True)
+        return
+
+    # 5. Мошенничество
+    if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
+        await punish(message, "Мошенничество", is_ban=True)
+        return
+
+    # 6. Политика
+    if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
+        await punish(message, "Политика")
+        return
+
+    # 7. Обсуждение админа
+    if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
+        await punish(message, "Обсуждение действий администрации")
+        return
+    
+    # 8. Обычный мат
+    for pattern in BAD_WORDS:
+        if re.search(pattern, text):
+            await punish(message, "Использование мата")
+            return
+
+    # 9. Спам
+    now = time.time()
+    if uid in user_messages and now - user_messages[uid] < 0.7:
+        await punish(message, "Спам/Флуд")
+        return
+    user_messages[uid] = now
 # --- ЗАПУСК ---
 
 @dp.message(F.text.lower() == "бот")
@@ -769,6 +757,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
