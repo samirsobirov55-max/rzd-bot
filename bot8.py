@@ -552,7 +552,7 @@ async def on_promoted(event: ChatMemberUpdated):
 async def get_id(message: types.Message):
     await message.answer(f"ID этого чата: {message.chat.id}\nТвой ID: {message.from_user.id}")
 
-    @dp.message()  # Здесь лишние пробелы в начале
+@dp.message()# Здесь лишние пробелы в начале
     async def global_mod(message: types.Message):
         # 1. Проверка на админа (всегда первая!)
         if not message.text or await is_admin(message): 
@@ -763,3 +763,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
