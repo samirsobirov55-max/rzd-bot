@@ -560,7 +560,7 @@ async def global_mod(message: types.Message):
         return
 
     # 2. Удаление английских букв
-    if re.search(r'[a-zA-Z]', message.text):
+if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
             return 
@@ -757,6 +757,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
