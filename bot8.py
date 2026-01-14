@@ -646,27 +646,18 @@ async def get_id(message: types.Message):
 
 @dp.message()
 async def global_mod(message: types.Message):
-    # 1. Сбор ID группы
+    # 1. Сбор ID групп (для рассылки)
     if message.chat.type in ['group', 'supergroup']:
         active_groups.add(message.chat.id)
 
-    # 2. Хендлер копирования для Владельца
-    if message.chat.type == "private" and message.from_user.id == OWNER_ID:
-        if message.text and not message.text.startswith("/"):
-            try:
-                await message.copy_to(chat_id=MY_GROUP_ID)
-                await message.delete()
-                return
-            except: return
+    # 2. ИГНОР АДМИНОВ (ВОТ ОН!)
+    if not message.text or await is_admin(message): 
+        return
 
-    # 3. Игнор админов
+    # 3. Дальше идут твои фильтры (английский, мат и т.д.)
     uid = message.from_user.id
     text = message.text.lower()
-
-    # Удаление любой английской буквы
-uid = message.from_user.id
-    text = message.text.lower()
-
+    
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
@@ -748,6 +739,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
