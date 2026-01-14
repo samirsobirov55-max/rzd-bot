@@ -352,7 +352,6 @@ async def punish(message, reason, is_ban=False, is_warn=False, hours=0):
     if is_ban:
         try:
             await message.chat.ban(user_id=uid)
-            # ВОТ ЭТА СТРОКА ВКЛЮЧАЕТ BANLIST:
             ban_list_history[uid] = f"Бан за: {reason}"
             await message.answer(f"🚫 Пользователь {message.from_user.first_name} забанен. Причина: {reason}")
             return
@@ -739,6 +738,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
