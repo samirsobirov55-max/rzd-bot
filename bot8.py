@@ -552,14 +552,23 @@ async def on_promoted(event: ChatMemberUpdated):
 async def get_id(message: types.Message):
     await message.answer(f"ID этого чата: {message.chat.id}\nТвой ID: {message.from_user.id}")
 
-@dp.message()# Здесь лишние пробелы в начале
-    async def global_mod(message: types.Message):
-        # 1. Проверка на админа (всегда первая!)
-        if not message.text or await is_admin(message): 
+@dp.message()
+async def global_mod(message: types.Message):
+    # 1. Проверка на админа
+    if not message.text or await is_admin(message): 
+        return
+
+    # 2. ВОТ ЗДЕСЬ должен быть английский (на том же уровне, что и if выше)
+    if re.search(r'[a-zA-Z]', message.text):
+        try:
+            await message.delete()
+            return 
+        except:
             return
-    
-        uid = message.from_user.id
-        text = message.text.lower()
+
+    # 3. Дальше весь остальной код...
+    uid = message.from_user.id
+    text = message.text.lower()
     
         # --- ВОТ СЮДА ПЕРЕНЕСИ ЭТИ СТРОКИ ---
         if "http" in text or "t.me/" in text:
@@ -609,10 +618,6 @@ async def get_id(message: types.Message):
         user_messages[uid] = now
 
 # --- ЗАПУСК ---
-    text = "Список мутов:\n\n"
-    for uid, info in mute_list_history.items():
-        text += f"• ID {uid}: {info}\n"
-    await message.answer(text)
 
 @dp.message(F.text.lower() == "бот")
 async def bot_status(message: types.Message):
@@ -762,6 +767,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
