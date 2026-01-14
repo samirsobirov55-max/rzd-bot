@@ -19,7 +19,7 @@ from aiogram.types import ChatPermissions, ChatMemberUpdated, InlineKeyboardButt
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import ChatMemberUpdatedFilter
 from aiohttp import web
-active_groups = set()
+active_groups = load_groups()
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.getenv('BOT_TOKEN') 
@@ -50,7 +50,7 @@ active_groups = load_groups()
 user_messages = {}     # Исправляет твою ошибку 'user_messages is not defined'
 user_warns = {}        # Для хранения количества варнов
 user_mute_level = {}   # Для прогрессии мутов
-active_groups = set()  # Список ID групп для новостей
+active_groups = load_groups() # Список ID групп для новостей
 join_history = []      # Для защиты от рейдов
 sent_news = []         # Чтобы новости не дублировались
 RAID_THRESHOLD = 3  # Порог входа (человек)
@@ -765,26 +765,3 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
