@@ -406,8 +406,11 @@ async def punish(message, reason, is_ban=False, is_warn=False, hours=0):
             f"Следующий мут будет в 2 раза дольше!"
         )
 
+   try:
+        # Твой код здесь
+        response = requests.get(url) 
     except Exception as e:
-        logging.error(f"Ошибка в функции punish: {e}")
+        print(f"Ошибка: {e}")
 # Функция, которая рассылает анекдот во все чаты
 async def send_joke_to_all_groups():
     global active_groups
@@ -738,6 +741,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
