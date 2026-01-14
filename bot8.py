@@ -30,6 +30,21 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+def save_groups(groups):
+    with open("groups.txt", "w") as f:
+        for gid in groups:
+            f.write(f"{gid}\n")
+
+def load_groups():
+    try:
+        with open("groups.txt", "r") as f:
+            return set(int(line.strip()) for line in f if line.strip())
+    except FileNotFoundError:
+        return set()
+
+# Инициализируем группы из файла
+active_groups = load_groups()
+
 # --- ИНИЦИАЛИЗАЦИЯ СЛОВАРЕЙ (ВСТАВЬ ЭТО В НАЧАЛО ФАЙЛА) ---
 # --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ (ДОЛЖНЫ БЫТЬ ТУТ) ---
 user_messages = {}     # Исправляет твою ошибку 'user_messages is not defined'
@@ -420,12 +435,17 @@ async def send_joke_to_all_groups():
     joke = random.choice(ANECDOTES)
     text = f"🚂 Минутка юмора в пути:\n\n{joke}"
     
+    deleted = False
     for chat_id in list(active_groups):
         try:
             await bot.send_message(chat_id, text)
-            await asyncio.sleep(0.1) # Защита от флуда самого бота
+            await asyncio.sleep(0.1)
         except:
-            active_groups.discard(chat_id) # Удаляем группу, если бота там нет
+            active_groups.discard(chat_id)
+            deleted = True
+    
+    if deleted:
+        save_groups(active_groups) # ОБНОВЛЯЕМ ФАЙЛ
 
 # --- ОБРАБОТЧИКИ ---
 
@@ -556,6 +576,10 @@ async def get_id(message: types.Message):
 
 @dp.message()
 async def global_mod(message: types.Message):
+    if message.chat.type in ['group', 'supergroup']:
+        if message.chat.id not in active_groups:
+            active_groups.add(message.chat.id)
+            save_groups(active_groups) # СОХРАНЯЕМ СРАЗУ
     # 1. Проверка на админа
     if not message.text or await is_admin(message): 
         return
@@ -741,6 +765,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
