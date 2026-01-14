@@ -560,16 +560,18 @@ async def global_mod(message: types.Message):
     if not message.text or await is_admin(message): 
         return
 
-    # 2. Удаление английских букв
-if re.search(r'[a-zA-Z]', message.text):
+    # 2. Удаление английских букв (ПОДВИНУЛ ВПРАВО!)
+    if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
-            return 
+            return
         except:
             return
 
     uid = message.from_user.id
     text = message.text.lower()
+    
+    # 3. Проверка на ссылки
     if "http" in text or "t.me/" in text:
         await punish(message, "рекламу/ссылки", is_ban=True)
         return
@@ -739,6 +741,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
