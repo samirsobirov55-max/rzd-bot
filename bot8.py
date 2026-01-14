@@ -660,17 +660,16 @@ async def global_mod(message: types.Message):
             except: return
 
     # 3. Игнор админов
-    if not message.text or await is_admin(message): 
-        return
+    uid = message.from_user.id
+    text = message.text.lower()
 
-    # 4. Удаление ЛЮБЫХ английских букв
+    # Удаление любой английской буквы
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
-            return 
+            return
         except:
             return
-
     # ВОТ ЗДЕСЬ ВСЁ ДОЛЖНО БЫТЬ В ОДНУ ЛИНИЮ:
     uid = message.from_user.id
     text = message.text.lower()
@@ -750,6 +749,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
