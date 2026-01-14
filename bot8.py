@@ -568,12 +568,10 @@ if re.search(r'[a-zA-Z]', message.text):
         except:
             return
 
-uid = message.from_user.id
-text = message.text.lower()
-
-    # 3. Проверка на ссылки (СТРОКА 574 - БОЛЬШЕ НЕТ ОШИБКИ)
+    uid = message.from_user.id
+    text = message.text.lower()
     if "http" in text or "t.me/" in text:
-        await punish(message, "Реклама", is_ban=True)
+        await punish(message, "рекламу/ссылки", is_ban=True)
         return
 
     # 4. Проверка на мат "шлюх"
@@ -741,6 +739,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
