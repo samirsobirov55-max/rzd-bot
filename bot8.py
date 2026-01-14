@@ -31,7 +31,7 @@ def load_groups():
         with open("groups.txt", "r") as f:
             return set(int(line.strip()) for line in f if line.strip())
     except FileNotFoundError:
-        return {-1002340798207}
+        return {-1002974508454}
 
 active_groups = load_groups()
 
@@ -770,6 +770,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
