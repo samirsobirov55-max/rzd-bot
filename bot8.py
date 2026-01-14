@@ -666,9 +666,8 @@ async def global_mod(message: types.Message):
     if not message.text or await is_admin(message): 
         return
 
-    uid = message.from_user.id
-    text = message.text.lower()
-
+    uid = message.from_user.id  # У тебя здесь сейчас лишние пробелы!
+    text = message.text.lower() # И здесь!
     # --- ФИЛЬТРЫ МОДЕРАЦИИ ---
 
     # Проверка на латиницу (только если длинное слово)
@@ -757,6 +756,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
