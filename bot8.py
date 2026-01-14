@@ -651,7 +651,7 @@ async def global_mod(message: types.Message):
         active_groups.add(message.chat.id)
 
     # 2. ИГНОР АДМИНОВ (ВОТ ОН!)
-    if not message.text or await is_admin(message): 
+    if not message.text or await is_admin(message):
         return
 
     # 3. Дальше идут твои фильтры (английский, мат и т.д.)
@@ -739,6 +739,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
