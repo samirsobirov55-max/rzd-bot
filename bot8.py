@@ -48,6 +48,7 @@ dp = Dispatcher()
 
 # --- ИНИЦИАЛИЗАЦИЯ СЛОВАРЕЙ (ВСТАВЬ ЭТО В НАЧАЛО ФАЙЛА) ---
 # --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ (ДОЛЖНЫ БЫТЬ ТУТ) ---
+user_mutes_count = {} # Храним, сколько раз юзера уже мутили
 user_messages = {}     # Исправляет твою ошибку 'user_messages is not defined'
 user_warns = {}        # Для хранения количества варнов
 user_mute_level = {}   # Для прогрессии мутов
@@ -577,61 +578,80 @@ async def get_id(message: types.Message):
 
 @dp.message()
 async def global_mod(message: types.Message):
-    # 1. Проверка на админа
+    # 1. Базовая проверка (текст и админы)
     if not message.text or await is_admin(message): 
         return
 
-    # Добавление группы в список и сохранение
+    # Добавление группы в список (для анекдотов)
     if message.chat.type in ['group', 'supergroup']:
         if message.chat.id not in active_groups:
             active_groups.add(message.chat.id)
             save_groups(active_groups)
-    if not message.text or await is_admin(message): 
-        return
 
-    # 2. Удаление английских букв (ПОДВИНУЛ ВПРАВО!)
+    uid = message.from_user.id
+    text = message.text.lower()
+
+    # 2. Удаление английских букв
     if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
             return
-        except:
-            return
+        except: return
 
-    uid = message.from_user.id
-    text = message.text.lower()
-    
-    # 3. Проверка на ссылки
+    # 3. Проверка на ссылки (БАН сразу)
     if "http" in text or "t.me/" in text:
         await punish(message, "рекламу/ссылки", is_ban=True)
         return
 
-    # 4. Проверка на мат "шлюх"
-    if re.search(r"\bшлюх\w*\b", text):
-        await punish(message, "Тяжелые оскорбления", is_ban=True)
+    # 4. ТЯЖЕЛЫЕ ОСКОРБЛЕНИЯ И МОШЕННИЧЕСТВО (БАН сразу)
+    if re.search(r"\bшлюх\w*\b", text) or any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
+        await punish(message, "Тяжелые нарушения/Мошенничество", is_ban=True)
         return
 
-    # 5. Мошенничество
-    if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
-        await punish(message, "Мошенничество", is_ban=True)
-        return
+    # 5. ПРОВЕРКА НА МАТЫ (СИСТЕМА ВАРНОВ И ПРОГРЕССИВНЫХ МУТОВ)
+    # Используем re.search для каждого паттерна из твоего списка BAD_WORDS
+    is_bad = False
+    for pattern in BAD_WORDS:
+        if re.search(pattern, text):
+            is_bad = True
+            break
+            
+    if is_bad:
+        user_warns[uid] = user_warns.get(uid, 0) + 1
+        
+        if user_warns[uid] < 3:
+            await message.reply(f"⚠️ Предупреждение ({user_warns[uid]}/3)! Не матерись.")
+            try: await message.delete()
+            except: pass
+        else:
+            user_warns[uid] = 0 
+            mutes = user_mutes_count.get(uid, 0)
+            minutes = 5 * (2 ** mutes)
+            
+            if minutes >= 1440: # Больше суток -> БАН
+                try:
+                    await message.chat.ban(uid)
+                    await message.answer(f"🚫 {message.from_user.first_name} забанен за рецидив!")
+                except: pass
+            else:
+                until = datetime.now() + timedelta(minutes=minutes)
+                try:
+                    await message.chat.restrict(uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
+                    user_mutes_count[uid] = mutes + 1 
+                    await message.answer(f"🔇 {message.from_user.first_name} мут на {minutes} мин. (Нарушение #3)")
+                    await message.delete()
+                except: pass
+        return # Важно! Выходим, чтобы не проверять на политику и т.д.
 
-    # 6. Политика
+    # 6. Политика, Админы и Спам (оставь как было)
     if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
         await punish(message, "Политика")
         return
 
-    # 7. Обсуждение админа
     if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
         await punish(message, "Обсуждение действий администрации")
         return
-    
-    # 8. Обычный мат
-    for pattern in BAD_WORDS:
-        if re.search(pattern, text):
-            await punish(message, "Использование мата")
-            return
 
-    # 9. Спам
     now = time.time()
     if uid in user_messages and now - user_messages[uid] < 0.7:
         await punish(message, "Спам/Флуд")
@@ -770,6 +790,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
