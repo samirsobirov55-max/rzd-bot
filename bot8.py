@@ -347,36 +347,35 @@ async def is_admin(message: types.Message):
     except: return False
 
 # --- УНИВЕРСАЛЬНАЯ ФУНКЦИЯ НАКАЗАНИЯ ---
-async def punish(message: types.Message, reason: str, is_ban: bool = False):
-    # Добавляем доступ к глобальным словарям
-    global user_warns, user_mute_level
-    
-    try:
-        uid = message.from_user.id
-        chat_id = message.chat.id
-        user_name = message.from_user.full_name
-
-        # Удаляем плохое сообщение сразу
+async def punish(message, reason, is_ban=False, is_warn=False, hours=0):
+    uid = message.from_user.id
+    if is_ban:
         try:
-            await message.delete()
-        except:
-            pass
-
-        # --- ПРОВЕРКА НА МГНОВЕННЫЙ БАН (Реклама / Тяжелый мат) ---
-        if is_ban:
-            await bot.ban_chat_member(chat_id, uid)
-            await message.answer(f"🚫 БАН: {user_name}\nПричина: {reason}")
-            ban_list_history[uid] = f"Бан за: {reason}" # Добавь вот это!
+            await message.chat.ban(user_id=uid)
+            # ВОТ ЭТА СТРОКА ВКЛЮЧАЕТ BANLIST:
+            ban_list_history[uid] = f"Бан за: {reason}"
+            await message.answer(f"🚫 Пользователь {message.from_user.first_name} забанен. Причина: {reason}")
             return
+        except: return
 
-        # --- НАКОПИТЕЛЬНАЯ СИСТЕМА ВАРНОВ ---
+    if is_warn:
         user_warns[uid] = user_warns.get(uid, 0) + 1
-        current_warns = user_warns[uid]
-
-        # 1 и 2 варн — просто предупреждаем
-        if current_warns < 3:
-            await message.answer(f"⚠️ ВАРН {current_warns}/3: {user_name}\nПричина: {reason}")
-            return
+        count = user_warns[uid]
+        if count >= 3:
+            user_warns[uid] = 0
+            lvl = user_mute_level.get(uid, 0) + 1
+            user_mute_level[uid] = lvl
+            duration = 5 * (2 ** (lvl - 1))
+            until = datetime.now() + timedelta(minutes=duration)
+            try:
+                await message.chat.restrict(uid, permissions=ChatPermissions(can_send_messages=False), until_date=until)
+                mute_list_history[uid] = f"Мут на {duration} мин (уровень {lvl})"
+                await message.answer(f"🔇 {message.from_user.first_name} замучен на {duration} мин за 3/3 варна!")
+            except: pass
+        else:
+            await message.answer(f"⚠️ ВАРН {count}/3: {message.from_user.first_name}\nПричина: {reason}")
+        try: await message.delete()
+        except: pass
 
         # --- ЕСЛИ 3-Й ВАРН: ПРИМЕНЯЕМ ПРОГРЕССИВНЫЙ МУТ ---
         user_warns[uid] = 0  # Сбрасываем варны после мута
@@ -647,72 +646,66 @@ async def get_id(message: types.Message):
 
 @dp.message()
 async def global_mod(message: types.Message):
-    # 1. Сбор ID группы для рассылки новостей/анекдотов
+    # 1. Сбор ID группы
     if message.chat.type in ['group', 'supergroup']:
         active_groups.add(message.chat.id)
 
-    # 2. Хендлер копирования для Владельца (в личке)
+    # 2. Хендлер копирования для Владельца
     if message.chat.type == "private" and message.from_user.id == OWNER_ID:
         if message.text and not message.text.startswith("/"):
             try:
                 await message.copy_to(chat_id=MY_GROUP_ID)
                 await message.delete()
                 return
-            except Exception as e:
-                await message.answer(f"❌ Ошибка копирования: {e}")
-                return
+            except: return
 
-    # 3. Если нет текста или пишет админ — игнорируем модерацию
+    # 3. Игнор админов
     if not message.text or await is_admin(message): 
         return
 
-    uid = message.from_user.id  # У тебя здесь сейчас лишние пробелы!
-    text = message.text.lower() # И здесь!
-    # --- ФИЛЬТРЫ МОДЕРАЦИИ ---
-
-    # Проверка на латиницу (только если длинное слово)
-    if re.search(r'[a-zA-Z]{6,}', message.text):
+    # 4. Удаление ЛЮБЫХ английских букв (без варна)
+    if re.search(r'[a-zA-Z]', message.text):
         try:
             await message.delete()
-            return # Удаляем и выходим
+            return 
         except: return
 
-    # Очистка текста для поиска скрытого мата
-    super_clean_text = re.sub(r"[^а-яё]", "", text) 
+    uid = message.from_user.id
+    text = message.text.lower()
 
-    # Мошенничество
+    # 5. Мошенничество (БАН)
     if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
-        await punish(message, "Мошенничество (Пункт 5)", is_ban=True)
+        await punish(message, "Мошенничество", is_ban=True)
         return
 
-    # Реклама
+    # 6. Реклама (БАН)
     if "http" in text or "t.me/" in text:
-        await punish(message, "Реклама (Пункт 7)")
+        await punish(message, "Реклама", is_ban=True)
         return
 
-    # Политика
-    if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
-        await punish(message, "Политика (Пункт 4)", hours=6)
-        return
-
-    # Оскорбление админа/бота
-    if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
-        await punish(message, "Обсуждение действий администрации (Пункт 9)", hours=12)
-        return
-
-    # Тяжелый мат
+    # 7. Тяжелый мат (БАН)
     if re.search(r"\bшлюх\w*\b", text):
-        await punish(message, "Тяжелые оскорбления (БАН)", is_ban=True)
+        await punish(message, "Тяжелые оскорбления", is_ban=True)
+        return
+
+    # 8. Политика и Обсуждение админов (ВАРНЫ)
+    if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
+        await punish(message, "Политика", is_warn=True)
+        return
+
+    if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
+        await punish(message, "Обсуждение действий администрации", is_warn=True)
         return
     
+    # 9. Обычный мат (ВАРНЫ)
     for pattern in BAD_WORDS:
         if re.search(pattern, text):
-            await punish(message, "Использование мата (Пункт 1)", is_warn=True)
+            await punish(message, "Использование мата", is_warn=True)
             return
 
+    # 10. Запись времени сообщения
     import time
-    now = time.time()
-    user_messages[uid] = now
+    user_messages[uid] = time.time()
 # --- ПЛАНИРОВЩИК И РАССЫЛКИ ---
 async def send_scheduled_msg(mode):
     global active_groups
@@ -756,6 +749,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
