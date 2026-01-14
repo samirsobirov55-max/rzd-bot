@@ -747,7 +747,6 @@ scheduler.add_job(send_scheduled_msg, "cron", hour=22, minute=0, args=["night"])
 scheduler.add_job(check_rjd_news, "interval", minutes=30)
 scheduler.add_job(check_roblox_updates, "interval", minutes=10)
 scheduler.add_job(send_joke_to_all_groups, "interval", hours=1)
-scheduler.start()
 # Строку со списком мутов (send_mute_list) МЫ УДАЛИЛИ ОТСЮДА
 
 # --- ЗАПУСК ---
@@ -771,6 +770,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
