@@ -567,8 +567,8 @@ if re.search(r'[a-zA-Z]', message.text):
         except:
             return
 
-    uid = message.from_user.id
-    text = message.text.lower()
+uid = message.from_user.id
+text = message.text.lower()
 
     # 3. Проверка на ссылки (СТРОКА 574 - БОЛЬШЕ НЕТ ОШИБКИ)
     if "http" in text or "t.me/" in text:
@@ -757,6 +757,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
