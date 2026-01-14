@@ -347,8 +347,8 @@ async def is_admin(message: types.Message):
     except: return False
 
 # --- УНИВЕРСАЛЬНАЯ ФУНКЦИЯ НАКАЗАНИЯ ---
-async def punish(message: types.Message, reason: str):
-    # Добавляем доступ к глобальным словарям, чтобы не было ошибки NameError
+async def punish(message: types.Message, reason: str, is_ban: bool = False):
+    # Добавляем доступ к глобальным словарям
     global user_warns, user_mute_level
     
     try:
@@ -356,38 +356,43 @@ async def punish(message: types.Message, reason: str):
         chat_id = message.chat.id
         user_name = message.from_user.full_name
 
-        # 1. Считаем варны
-        user_warns[uid] = user_warns.get(uid, 0) + 1
-        current_warns = user_warns[uid]
-
-        # Удаляем плохое сообщение
+        # Удаляем плохое сообщение сразу
         try:
             await message.delete()
         except:
             pass
 
-        # 2. Если варнов 1 или 2 — просто предупреждаем
-        if current_warns < 3:
-            await message.answer(f"ВАРН {current_warns}/3: {user_name}\nПричина: {reason}")
+        # --- ПРОВЕРКА НА МГНОВЕННЫЙ БАН (Реклама / Тяжелый мат) ---
+        if is_ban:
+            await bot.ban_chat_member(chat_id, uid)
+            await message.answer(f"🚫 БАН: {user_name}\nПричина: {reason}")
             return
 
-        # 3. Если 3-й варн — считаем уровень мута и обнуляем варны
-        user_warns[uid] = 0 
+        # --- НАКОПИТЕЛЬНАЯ СИСТЕМА ВАРНОВ ---
+        user_warns[uid] = user_warns.get(uid, 0) + 1
+        current_warns = user_warns[uid]
+
+        # 1 и 2 варн — просто предупреждаем
+        if current_warns < 3:
+            await message.answer(f"⚠️ ВАРН {current_warns}/3: {user_name}\nПричина: {reason}")
+            return
+
+        # --- ЕСЛИ 3-Й ВАРН: ПРИМЕНЯЕМ ПРОГРЕССИВНЫЙ МУТ ---
+        user_warns[uid] = 0  # Сбрасываем варны после мута
         mute_step = user_mute_level.get(uid, 0) + 1
         user_mute_level[uid] = mute_step
 
-        # Прогрессия: 5 мин, 30 мин, 2 часа, 6 часов, 24 часа
-        times = [5, 30, 120, 360, 1440]
-        # Если нарушений очень много, ставим максимум (24ч)
-        minutes = times[mute_step-1] if mute_step <= len(times) else 1440
+        # Прогрессия: 5 мин, 10 мин, 20 мин, 40 мин, 80 мин и т.д.
+        # Формула: 5 * (2 в степени (номер мута - 1))
+        minutes = 5 * (2 ** (mute_step - 1))
         
-        # 4. Если дошли до лимита (24ч) — БАН
+        # Лимит мута — 24 часа (1440 мин). Если больше — баним.
         if minutes >= 1440:
             await bot.ban_chat_member(chat_id, uid)
-            await message.answer(f"БАН: {user_name}\nПричина: Повторные нарушения (лимит мутов превышен)")
+            await message.answer(f"🚫 БАН: {user_name}\nПричина: Систематические нарушения (Лимит мутов превышен)")
             return
 
-        # 5. ТЕХНИЧЕСКИЙ МУТ
+        # Накладываем технический мут
         until_date = datetime.now() + timedelta(minutes=minutes)
         await bot.restrict_chat_member(
             chat_id, 
@@ -395,10 +400,15 @@ async def punish(message: types.Message, reason: str):
             permissions=ChatPermissions(can_send_messages=False),
             until_date=until_date
         )
-        await message.answer(f"МУТ на {minutes} мин.: {user_name}\nПричина: 3/3 варна ({reason})")
+        
+        await message.answer(
+            f"🔇 МУТ на {minutes} мин.: {user_name}\n"
+            f"Причина: 3/3 варна ({reason})\n"
+            f"Следующий мут будет в 2 раза дольше!"
+        )
 
     except Exception as e:
-        logging.error(f"Ошибка автоматики в punish: {e}")
+        logging.error(f"Ошибка в функции punish: {e}")
 # Функция, которая рассылает анекдот во все чаты
 async def send_joke_to_all_groups():
     global active_groups
@@ -542,9 +552,8 @@ async def on_promoted(event: ChatMemberUpdated):
 async def get_id(message: types.Message):
     await message.answer(f"ID этого чата: {message.chat.id}\nТвой ID: {message.from_user.id}")
 
-@dp.message()
+@dp.message() # <--- Видишь? Здесь нет фильтра, поэтому она хватает ВСЁ
 async def global_mod(message: types.Message):
-    # 1. Сбор ID группы для рассылки новостей/анекдотов
     if message.chat.type in ['group', 'supergroup']:
         active_groups.add(message.chat.id)
 
@@ -566,6 +575,23 @@ async def global_mod(message: types.Message):
     uid = message.from_user.id
     text = message.text.lower()
 
+@dp.message()  # Здесь лишние пробелы в начале
+async def global_mod(message: types.Message):
+    # 1. Проверка на админа (всегда первая!)
+    if not message.text or await is_admin(message): 
+        return
+
+    uid = message.from_user.id
+    text = message.text.lower()
+
+    # --- ВОТ СЮДА ПЕРЕНЕСИ ЭТИ СТРОКИ ---
+    if "http" in text or "t.me/" in text:
+        await punish(message, "Реклама", is_ban=True)
+        return
+
+    if re.search(r"\bшлюх\w*\b", text):
+        await punish(message, "Тяжелые оскорбления", is_ban=True)
+        return
     # --- ФИЛЬТРЫ МОДЕРАЦИИ ---
 
     # Проверка на латиницу (только если длинное слово)
@@ -580,39 +606,29 @@ async def global_mod(message: types.Message):
 
     # Мошенничество
     if any(x in text for x in ["robux", "робукс", "продам акк", "cheat"]):
-        await punish(message, "Мошенничество (Пункт 5)", is_ban=True)
-        return
-
-    # Реклама
-    if "http" in text or "t.me/" in text:
-        await punish(message, "Реклама (Пункт 7)", hours=24)
+        await punish(message, "Мошенничество", is_ban=True)
         return
 
     # Политика
     if any(x in text for x in ["политика", "путин", "война", "зеленский"]):
-        await punish(message, "Политика (Пункт 4)", hours=6)
+        await punish(message, "Политика")
         return
 
     # Оскорбление админа/бота
     if any(x in text for x in ["админ лох", "почему мут", "тупой бот"]):
-        await punish(message, "Обсуждение действий администрации (Пункт 9)", hours=12)
-        return
-
-    # Тяжелый мат
-    if re.search(r"\bшлюх\w*\b", text):
-        await punish(message, "Тяжелые оскорбления (БАН)", is_ban=True)
+        await punish(message, "Обсуждение действий администрации")
         return
     
     # Обычный мат из списка BAD_WORDS
     for pattern in BAD_WORDS:
         if re.search(pattern, text):
-            await punish(message, "Использование мата (Пункт 1)", is_warn=True)
+            await punish(message, "Использование мата")
             return
 
     # Защита от спама (флуда)
     now = time.time()
     if uid in user_messages and now - user_messages[uid] < 0.7:
-        await punish(message, "Спам/Флуд (Пункт 2)", hours=1)
+        await punish(message, "Спам/Флуд")
         return
     user_messages[uid] = now
 
@@ -701,7 +717,7 @@ async def global_mod(message: types.Message):
 
     # Реклама
     if "http" in text or "t.me/" in text:
-        await punish(message, "Реклама (Пункт 7)", hours=24)
+        await punish(message, "Реклама (Пункт 7)")
         return
 
     # Политика
@@ -770,6 +786,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
