@@ -648,7 +648,11 @@ async def process_music_name(message: types.Message, state: FSMContext):
     await state.clear()
 
 @dp.message()
-async def global_mod(message: types.Message):
+async def global_mod(message: types.Message, state: FSMContext): # Добавь state сюда
+    # ПЕРВАЯ СТРОКА: Если пользователь сейчас ищет музыку, игнорируем это сообщение в модерации
+    current_state = await state.get_state()
+    if current_state == MusicSearch.waiting_for_name:
+        return
     # 1. Базовая проверка (текст и админы)
     if not message.text or await is_admin(message): 
         return
@@ -872,6 +876,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
