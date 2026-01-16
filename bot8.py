@@ -584,14 +584,13 @@ async def get_id(message: types.Message):
 
 @dp.message(Command("findmusic"))
 async def cmd_findmusic(message: types.Message, state: FSMContext):
-    await message.answer("🎵 Введите название песни:")
-    # Переводим пользователя в режим ожидания названия
+    await message.reply("🎵 Введите название песни:")
     await state.set_state(MusicSearch.waiting_for_name)
 
 @dp.message(MusicSearch.waiting_for_name)
 async def process_music_name(message: types.Message, state: FSMContext):
     # Если пользователь передумал и ввел другую команду
-    if message.text.startswith("/"):
+    if message.text and message.text.startswith("/"):
         await state.clear()
         return
 
@@ -600,14 +599,21 @@ async def process_music_name(message: types.Message, state: FSMContext):
     
     # Создаем папку для загрузок, если её нет
     if not os.path.exists('downloads'):
-        os.makedirs('downloads')
+        os.makedirs('downloads', exist_ok=True)
 
     # Настройки для скачивания (YouTube -> MP3)
     ydl_opts = {
         'format': 'bestaudio/best',
-        'default_search': 'ytsearch1:', # Ищет первое совпадение
+        'default_search': 'ytsearch1:',
         'outtmpl': f'downloads/%(title)s.%(ext)s',
         'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web'],
+            }
+        },
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -616,6 +622,7 @@ async def process_music_name(message: types.Message, state: FSMContext):
     }
 
     try:
+        # Важно: запускаем скачивание внутри блока try
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(query, download=True)
             entry = info['entries'][0] if 'entries' in info else info
@@ -623,19 +630,22 @@ async def process_music_name(message: types.Message, state: FSMContext):
             filename = ydl.prepare_filename(entry).rsplit('.', 1)[0] + ".mp3"
 
         # Отправляем аудио файл пользователю
-        audio_file = types.FSInputFile(filename)
-        await message.answer_audio(audio_file, caption=f"✅ Готово! Наслаждайтесь музыкой.")
-        
-        # Сразу удаляем, чтобы на Render не кончилось место
         if os.path.exists(filename):
+            audio_file = types.FSInputFile(filename)
+            await message.answer_audio(audio_file, caption=f"✅ Готово! Наслаждайтесь музыкой.")
+            # Удаляем файл
             os.remove(filename)
             
     except Exception as e:
-        await message.answer("❌ Ошибка при поиске. Попробуйте другое название.")
+        await message.answer("❌ Ошибка при поиске. Возможно, YouTube заблокировал запрос.")
         print(f"Ошибка музыки: {e}")
     
-    await waiting_msg.delete()
-    await state.clear() # Выходим из режима ожидания
+    # В любом случае удаляем статус "ищу" и сбрасываем состояние
+    try:
+        await waiting_msg.delete()
+    except:
+        pass
+    await state.clear()
 
 @dp.message()
 async def global_mod(message: types.Message):
@@ -862,6 +872,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
