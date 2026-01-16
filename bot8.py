@@ -594,8 +594,10 @@ async def cmd_stop(message: types.Message, state: FSMContext):
 
 @dp.message(MusicSearch.waiting_for_name)
 async def process_music_name(message: types.Message, state: FSMContext):
+    # Если пользователь ввел любую команду вместо названия песни — отменяем поиск
     if message.text and message.text.startswith("/"):
         await state.clear()
+        # Позволяем айограмму передать эту команду соответствующему хендлеру
         return
 
     query = message.text
@@ -646,6 +648,7 @@ async def process_music_name(message: types.Message, state: FSMContext):
         try: await waiting_msg.delete()
         except: pass
         await state.clear()
+        
 @dp.message()
 async def global_mod(message: types.Message, state: FSMContext): # Добавь state сюда
     # ПЕРВАЯ СТРОКА: Если пользователь сейчас ищет музыку, игнорируем это сообщение в модерации
@@ -875,6 +878,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
