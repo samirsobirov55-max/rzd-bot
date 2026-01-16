@@ -4,3 +4,4 @@ pytz
 httpx
 feedparser
 beautifulsoup4
+yt-dlp
