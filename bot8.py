@@ -422,14 +422,17 @@ async def punish(message, reason, is_ban=False, is_warn=False, hours=0):
             permissions=ChatPermissions(can_send_messages=False),
             until_date=until_date
         )
-        
-        await message.answer(
-            f"🔇 МУТ на {minutes} мин.: {user_name}\n"
-            f"Причина: 3/3 варна ({reason})\n"
-            f"Следующий мут будет в 2 раза дольше!"
-        )
 
-    await message.answer(...) # 4 пробела
+# Отправка уведомления о муте
+    await message.answer(
+        f"🔇 МУТ на {minutes} мин.: {user_name}\n"
+        f"Причина: 3/3 варна ({reason})\n"
+        f"Следующий мут будет в 2 раза дольше!"
+    )
+
+    # Дополнительная строка уведомления
+    await message.answer(f"⚠️ Пользователь наказан за: {reason}")
+# Или любой другой текст в кавычках
     try:                      # 4 пробела (ДОБАВЬ ИХ ТУТ!)
         await message.delete() # 8 пробелов
     except Exception as e:     # 4 пробела (И ТУТ!)
@@ -878,6 +881,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
