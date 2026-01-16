@@ -1,3 +1,6 @@
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
+import yt_dlp
 import feedparser
 import httpx
 from bs4 import BeautifulSoup
@@ -19,6 +22,9 @@ from aiogram.types import ChatPermissions, ChatMemberUpdated, InlineKeyboardButt
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import ChatMemberUpdatedFilter
 from aiohttp import web
+
+class MusicSearch(StatesGroup):
+    waiting_for_name = State()
 
 # Слово def должно начинаться С ПЕРВОГО СИМВОЛА СТРОКИ
 def save_groups(groups):
@@ -576,6 +582,61 @@ async def on_promoted(event: ChatMemberUpdated):
 async def get_id(message: types.Message):
     await message.answer(f"ID этого чата: {message.chat.id}\nТвой ID: {message.from_user.id}")
 
+@dp.message(Command("findmusic"))
+async def cmd_findmusic(message: types.Message, state: FSMContext):
+    await message.answer("🎵 Введите название песни:")
+    # Переводим пользователя в режим ожидания названия
+    await state.set_state(MusicSearch.waiting_for_name)
+
+@dp.message(MusicSearch.waiting_for_name)
+async def process_music_name(message: types.Message, state: FSMContext):
+    # Если пользователь передумал и ввел другую команду
+    if message.text.startswith("/"):
+        await state.clear()
+        return
+
+    query = message.text
+    waiting_msg = await message.answer(f"⏳ Ищу «{query}»... Это может занять до минуты.")
+    
+    # Создаем папку для загрузок, если её нет
+    if not os.path.exists('downloads'):
+        os.makedirs('downloads')
+
+    # Настройки для скачивания (YouTube -> MP3)
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'default_search': 'ytsearch1:', # Ищет первое совпадение
+        'outtmpl': f'downloads/%(title)s.%(ext)s',
+        'noplaylist': True,
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(query, download=True)
+            entry = info['entries'][0] if 'entries' in info else info
+            # Формируем путь к итоговому файлу
+            filename = ydl.prepare_filename(entry).rsplit('.', 1)[0] + ".mp3"
+
+        # Отправляем аудио файл пользователю
+        audio_file = types.FSInputFile(filename)
+        await message.answer_audio(audio_file, caption=f"✅ Готово! Наслаждайтесь музыкой.")
+        
+        # Сразу удаляем, чтобы на Render не кончилось место
+        if os.path.exists(filename):
+            os.remove(filename)
+            
+    except Exception as e:
+        await message.answer("❌ Ошибка при поиске. Попробуйте другое название.")
+        print(f"Ошибка музыки: {e}")
+    
+    await waiting_msg.delete()
+    await state.clear() # Выходим из режима ожидания
+
 @dp.message()
 async def global_mod(message: types.Message):
     # 1. Базовая проверка (текст и админы)
@@ -801,6 +862,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
