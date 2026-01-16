@@ -604,7 +604,7 @@ async def process_music_name(message: types.Message, state: FSMContext):
     # Настройки для скачивания (YouTube -> MP3)
     ydl_opts = {
         'format': 'bestaudio/best',
-        'default_search': 'ytsearch1:',
+        'default_search': 'scsearch1:',
         'outtmpl': f'downloads/%(title)s.%(ext)s',
         'noplaylist': True,
         'quiet': True,
@@ -872,6 +872,7 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logging.info("Бот остановлен")
+
 
 
 
